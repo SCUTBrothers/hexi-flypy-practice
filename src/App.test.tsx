@@ -454,3 +454,31 @@ test("typing fades chrome automatically, Escape wakes it, and focus veil restore
   await user.click(veil);
   expect(field).toBe(document.activeElement);
 });
+test("typing letters after closing a dialog with Escape or focusing a button immediately resumes input", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const code = encode(screen.getByTestId("pinyin").textContent!);
+  await user.click(screen.getByRole("button", { name: "界面主题" }));
+  await user.click(screen.getByRole("button", { name: /宣纸/ }));
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "界面主题" })),
+  );
+  await user.keyboard(code);
+  expect(document.activeElement).toBe(input());
+  expect(screen.getByText("上一题")).toBeTruthy();
+
+  await user.click(screen.getByRole("button", { name: "影子跟打" }));
+  screen.getByRole("button", { name: "界面主题" }).focus();
+  await user.keyboard("mw");
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "影子跟打输入" }));
+  expect(document.querySelector(".shadow-passage [aria-current]")?.textContent).toBe("天");
+});
+test("switching from Chinese IME to ABC without compositionend does not lock typing", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const code = encode(screen.getByTestId("pinyin").textContent!);
+  fireEvent.compositionStart(input());
+  await user.type(input(), code);
+  expect(screen.getByText("上一题")).toBeTruthy();
+});

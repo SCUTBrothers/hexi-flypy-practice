@@ -33,6 +33,17 @@ const articleGroups = [...new Set(ARTICLES.map((article) => article.tag))].map((
 }));
 const articleOrder = articleGroups.flatMap(({ articles }) => articles);
 
+function hasOpenLayer(): boolean {
+  if (document.querySelector('[role="dialog"]:not([hidden]), [data-open][data-slot$="-content"]')) {
+    return true;
+  }
+  try {
+    return Boolean(document.querySelector("[popover]:popover-open"));
+  } catch {
+    return false;
+  }
+}
+
 function nextShadowArticle(id: string, completed: ReadonlySet<string>, order: Article[]) {
   const index = order.findIndex((article) => article.id === id);
   const following = [...order.slice(index + 1), ...order.slice(0, index)];
@@ -143,15 +154,17 @@ export function ShadowPractice({
     setSaveFailed(!saveShadow(article.id, { signature, strokes }));
   }, [article.id, session.done, signature, strokes]);
 
-  // Keep the hidden input caret pinned at the end for mobile soft keyboards and programmatic text commits.
+  // Keep the hidden input value and caret pinned for soft keyboards and interrupted IME sessions.
   useLayoutEffect(() => {
     const el = inputRef.current;
-    if (!el || document.activeElement !== el) return;
+    if (!el || composing.current) return;
+    if (el.value !== session.input) el.value = session.input;
+    if (document.activeElement !== el) return;
     const end = el.value.length;
     if (el.selectionStart !== end || el.selectionEnd !== end) {
       el.setSelectionRange(end, end);
     }
-  }, [session.input]);
+  }, [session.input, session.index]);
 
   useEffect(() => {
     const passage = passageRef.current;
@@ -164,7 +177,12 @@ export function ShadowPractice({
     }
   }, [displayedIndex]);
 
-  // Clicking empty background and pressing a letter key returns focus straight to the passage.
+  const typeRef = useRef(type);
+  typeRef.current = type;
+  const inputValueRef = useRef(session.input);
+  inputValueRef.current = session.input;
+
+  // Pressing a plain letter while focused on non-text chrome snaps focus back and submits immediately.
   useEffect(() => {
     if (session.done || isReplaying) return;
     const handleKey = (event: KeyboardEvent) => {
@@ -172,15 +190,19 @@ export function ShadowPractice({
       if (!/^[a-z]$/i.test(event.key)) return;
       const activeEl = document.activeElement;
       if (
-        activeEl &&
-        activeEl !== document.body &&
-        activeEl !== document.documentElement &&
-        activeEl.closest("input, textarea, select, button, a, [role='dialog'], [popover]")
+        activeEl?.closest(
+          'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="textbox"], [role="dialog"], [popover]',
+        )
       ) {
         return;
       }
-      if (document.querySelector("[popover]:popover-open, [role='dialog']")) return;
-      inputRef.current?.focus({ preventScroll: true });
+      if (hasOpenLayer()) return;
+      const field = inputRef.current;
+      if (!field || field.disabled) return;
+      event.preventDefault();
+      composing.current = false;
+      field.focus({ preventScroll: true });
+      typeRef.current(inputValueRef.current + event.key.toLowerCase());
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -450,8 +472,24 @@ export function ShadowPractice({
                 }
               });
             }}
-            onBlur={() => setFocused(false)}
+            onBlur={() => {
+              composing.current = false;
+              setFocused(false);
+            }}
+            onKeyDown={(event) => {
+              if (
+                !event.nativeEvent.isComposing &&
+                event.key !== "Process" &&
+                event.keyCode !== 229
+              ) {
+                composing.current = false;
+              }
+            }}
             onValueChange={(value, details) => {
+              const nativeEvent = details.event;
+              if (nativeEvent && "isComposing" in nativeEvent && !nativeEvent.isComposing) {
+                composing.current = false;
+              }
               const normalized = value.toLowerCase();
               if (
                 !current ||
@@ -468,7 +506,8 @@ export function ShadowPractice({
             }}
             onCompositionEnd={(event) => {
               composing.current = false;
-              if (/[^a-z]/i.test(event.data)) onInput(event.data);
+              if (/^[a-z]+$/i.test(event.data)) type(session.input + event.data);
+              else if (/[^a-z]/i.test(event.data)) onInput(event.data);
             }}
             autoComplete="off"
             autoCorrect="off"

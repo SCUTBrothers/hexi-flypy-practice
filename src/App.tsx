@@ -305,6 +305,17 @@ function Answer({ item }: { item: Item }) {
   );
 }
 
+function hasOpenLayer(): boolean {
+  if (document.querySelector('[role="dialog"]:not([hidden]), [data-open][data-slot$="-content"]')) {
+    return true;
+  }
+  try {
+    return Boolean(document.querySelector("[popover]:popover-open"));
+  } catch {
+    return false;
+  }
+}
+
 function readAudioSettings(): { autoRead: boolean; rate: number } {
   try {
     const p = JSON.parse(localStorage.getItem("hexi-audio-v1") || "null");
@@ -477,15 +488,18 @@ export default function App() {
     if (!session?.paused) inputRef.current?.focus({ preventScroll: true });
   }, [session?.items, session?.paused]);
 
-  // Keep the drill input caret at the end so half-typed characters never reverse on soft keyboards.
+  // Keep the drill input value and caret synced after focus or interrupted IME compositions.
   useLayoutEffect(() => {
     const el = inputRef.current;
-    if (!el || document.activeElement !== el) return;
+    if (!el || composing.current) return;
+    const expected = session?.input ?? "";
+    if (el.value !== expected) el.value = expected;
+    if (document.activeElement !== el) return;
     const end = el.value.length;
     if (el.selectionStart !== end || el.selectionEnd !== end) {
       el.setSelectionRange(end, end);
     }
-  }, [session?.input]);
+  }, [session?.input, session?.index]);
 
   useEffect(() => {
     if (!zenFade) return;
@@ -531,7 +545,12 @@ export default function App() {
     soundOpen,
   ]);
 
-  // In drill modes, pressing a plain letter while unfocused snaps focus right back into typing.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const sessionInputRef = useRef(session?.input ?? "");
+  sessionInputRef.current = session?.input ?? "";
+
+  // In drill modes, pressing a plain letter while focused on non-text chrome snaps back and types immediately.
   useEffect(() => {
     if (!session || session.done || session.paused || page === "shadow" || page === "rows") return;
     if (anyDialogOpen) return;
@@ -540,19 +559,23 @@ export default function App() {
       if (!/^[a-z]$/i.test(event.key)) return;
       const activeEl = document.activeElement;
       if (
-        activeEl &&
-        activeEl !== document.body &&
-        activeEl !== document.documentElement &&
-        activeEl.closest("input, textarea, select, button, a, [role='dialog'], [popover]")
+        activeEl?.closest(
+          'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="textbox"], [role="dialog"], [popover]',
+        )
       ) {
         return;
       }
-      if (document.querySelector("[popover]:popover-open, [role='dialog']")) return;
-      inputRef.current?.focus({ preventScroll: true });
+      if (hasOpenLayer()) return;
+      const field = inputRef.current;
+      if (!field || field.disabled) return;
+      event.preventDefault();
+      composing.current = false;
+      field.focus({ preventScroll: true });
+      submitRef.current(sessionInputRef.current + event.key.toLowerCase());
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [session, page, anyDialogOpen]);
+  }, [session?.done, session?.paused, page, anyDialogOpen]);
 
   useEffect(
     () => () => {
@@ -1052,8 +1075,15 @@ export default function App() {
                     }
                   });
                 }}
-                onBlur={() => setDrillFocused(false)}
+                onBlur={() => {
+                  composing.current = false;
+                  setDrillFocused(false);
+                }}
                 onValueChange={(value, details) => {
+                  const nativeEvent = details.event;
+                  if (nativeEvent && "isComposing" in nativeEvent && !nativeEvent.isComposing) {
+                    composing.current = false;
+                  }
                   const letters = value.toLowerCase();
                   if (
                     current &&
@@ -1067,11 +1097,15 @@ export default function App() {
                 onCompositionStart={() => {
                   composing.current = true;
                 }}
-                onCompositionEnd={() => {
+                onCompositionEnd={(e) => {
                   composing.current = false;
-                  submit("中文");
+                  const text = e.data || e.currentTarget.value;
+                  submit(/^[a-z]+$/i.test(text) ? text : "中文");
                 }}
                 onKeyDown={(e) => {
+                  if (!e.nativeEvent.isComposing && e.key !== "Process" && e.keyCode !== 229) {
+                    composing.current = false;
+                  }
                   if (e.key === " " && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     play();
@@ -1100,6 +1134,8 @@ export default function App() {
                 <span className="mt-error-text">{session.error}</span>
               ) : hints && !hidden ? (
                 <span className="mt-accent-text">正确按键：{current?.answer.toUpperCase()}</span>
+              ) : !drillFocused && !session.paused ? (
+                <span className="text-muted-foreground">按任意字母键或点击此处继续输入</span>
               ) : (
                 <span className="text-muted-foreground">
                   英文输入法 · 空格重听 · 输对自动下一题
