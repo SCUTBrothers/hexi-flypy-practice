@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createAgent } from "@ui-sdk/react/agent";
 import { expect, test } from "vite-plus/test";
@@ -18,7 +18,8 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   const active = () => view.container.querySelector(".shadow-passage [aria-current]");
   expect(field).toBe(document.activeElement);
   expect(screen.getByText(`已练习 0 / ${ARTICLES.length} 篇`)).toBeTruthy();
-  expect(screen.getByRole("option", { name: "慢慢来，也很好 · 未练习" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "切换跟打文章，当前《慢慢来，也很好》" })).toBeTruthy();
+  expect(screen.getByText("未练习")).toBeTruthy();
   expect(active()).toHaveProperty("textContent", "每");
   expect(active()?.getAttribute("data-state")).toBe("waiting");
   expect(view.container.querySelector(".shadow-passage")?.textContent).toBe(
@@ -43,7 +44,7 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   expect(screen.getByRole("row", { name: /按错次数 1/ })).toBeTruthy();
   expect(screen.getByRole("row", { name: /完成汉字 13/ })).toBeTruthy();
   expect(screen.getByText(`已练习 1 / ${ARTICLES.length} 篇`)).toBeTruthy();
-  expect(screen.getByRole("option", { name: "慢慢来，也很好 · 已练习" })).toBeTruthy();
+  expect(screen.getByText("已练习", { exact: true })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "再跟打一轮" }));
   expect(screen.getByRole("button", { name: "回放上次" })).toBeTruthy();
   expect(view.container.querySelector("[data-shadow-caret]")?.textContent).toBe("每");
@@ -349,6 +350,7 @@ test("find a contrast passage and start a paced run with two key positions", asy
   await user.type(search, "林间很静");
   await user.click(screen.getByRole("button", { name: "影子跟打《听见风铃》" }));
   await user.selectOptions(screen.getByRole("combobox", { name: "影子节奏" }), "60");
+  await waitFor(() => expect(screen.getByLabelText("影子跟打输入")).toBe(document.activeElement));
   const caret = () => container.querySelector<HTMLElement>(".passage-caret:not(.ghost-caret)")!;
   expect(container.querySelector(".ghost-caret")).toBeTruthy();
   expect(caret().dataset.index).toBe("0");
@@ -376,10 +378,48 @@ test("keystroke sound preferences survive remount independently of spoken hints"
   await user.click(screen.getByRole("radio", { name: "机械键" }));
   await user.click(screen.getByRole("radio", { name: "轻" }));
   await user.click(screen.getByRole("button", { name: "完成" }));
+  await waitFor(() => expect(input()).toBe(document.activeElement));
   expect(JSON.parse(localStorage.getItem("hexi-audio-v1")!).autoRead).toBe(false);
   view.unmount();
   render(<App />);
   await user.click(screen.getByRole("button", { name: "击键声" }));
   expect(screen.getByRole("radio", { name: "机械键" }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole("radio", { name: "轻" }).getAttribute("aria-checked")).toBe("true");
+});
+
+test("article lookup supports keyboard selection and dismissal preserves a half-typed character", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "影子跟打" }));
+  const field = () => screen.getByRole("textbox", { name: "影子跟打输入" });
+  const picker = () => screen.getByRole("button", { name: /切换跟打文章/ });
+  await user.keyboard("m");
+  await user.click(picker());
+  const search = () => screen.getByRole("combobox", { name: "查找跟打文章" });
+  await user.type(search(), "xyzzy");
+  expect(screen.getByText("没有找到匹配的文章")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "清空搜索" }));
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(field()).toBe(document.activeElement));
+  expect(field()).toHaveProperty("value", "m");
+  await user.click(picker());
+  await user.type(search(), "林间很静{Enter}");
+  await waitFor(() => expect(picker().getAttribute("aria-label")).toContain("听见风铃"));
+  expect(field()).toBe(document.activeElement);
+  await user.keyboard(encode("lin"));
+  expect(document.querySelector(".shadow-passage [aria-current]")?.textContent).toBe("间");
+});
+test("group picker switches directly to typing and leaves the active group intact on cancel", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const trigger = screen.getByRole("button", { name: "切换分组" });
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "选择练习分组" });
+  await user.click(within(dialog).getByRole("button", { name: /零声母/ }));
+  await waitFor(() => expect(input()).toBe(document.activeElement));
+  expect(screen.getByRole("heading", { name: "零声母" })).toBeTruthy();
+  await user.click(trigger);
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(trigger).toBe(document.activeElement));
+  expect(screen.getByRole("heading", { name: "零声母" })).toBeTruthy();
 });

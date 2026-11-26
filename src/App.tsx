@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from "@ui-sdk/react/dialog";
 import { Progress, ProgressTrack, ProgressIndicator } from "@ui-sdk/react/progress";
+import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { Badge } from "@/components/reui/badge";
 import { ARTICLES, EXAMPLES, GROUPS, INITIALS, KEYMAP } from "./data";
 import {
@@ -312,6 +313,9 @@ export default function App() {
   const [saveError, setSaveError] = useState("");
   const [keySound, setKeySound] = useState(readKeySound);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const focusAfterSound = useRef(false);
+  const focusAfterGroup = useRef(false);
   const [focusMode, setFocusMode] = useState(false);
   const [pressed, setPressed] = useState<{ key: string; wrong: boolean }>();
   const releaseKey = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -513,10 +517,35 @@ export default function App() {
       dispatch({ type: "start", session: null });
     }
   }
+  const groupButtons =
+    page === "practice" &&
+    GROUPS.map((g, i) => (
+      <Button
+        key={g.id}
+        onClick={() => {
+          if (groupOpen) {
+            focusAfterGroup.current = true;
+            setGroupOpen(false);
+          }
+          if (g.id !== groupId) chooseGroup(g.id);
+          else inputRef.current?.focus({ preventScroll: true });
+        }}
+        className="course-card"
+        aria-current={groupId === g.id ? "step" : undefined}
+      >
+        <span className="course-number">{isDone(g.id) ? "✓" : String(i + 1).padStart(2, "0")}</span>
+        <span>
+          <strong>{g.label}</strong>
+          <small>
+            {g.id === "initial" ? "SH · CH · ZH" : g.keys.split("").join(" ").toUpperCase()}
+          </small>
+        </span>
+      </Button>
+    ));
   const practicePanel = session && page !== "shadow" && page !== "rows" && (
     <>
-      <section className="panel practice-stage overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-5 sm:px-7">
+      <Frame className="practice-stage" stacked>
+        <FrameHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Badge variant="secondary">
               {page === "practice" ? "专项练习" : pages[page].label}
@@ -549,9 +578,9 @@ export default function App() {
               重新开始
             </Button>
           </div>
-        </div>
+        </FrameHeader>
         {session.done ? (
-          <div className="result px-6 py-12 text-center">
+          <FramePanel className="result text-center">
             <div className="result-seal">✓</div>
             <p className="eyebrow mt-5">本轮练习完成</p>
             <h2 className="mt-3 text-2xl font-semibold">又熟悉了一点。</h2>
@@ -574,10 +603,10 @@ export default function App() {
                 <Icon name="arrow" />
               </Button>
             </div>
-          </div>
+          </FramePanel>
         ) : (
           <>
-            <div className="question-area px-5 py-7 text-center sm:px-7">
+            <FramePanel className="question-area text-center">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
                 <span>
                   本轮进度{" "}
@@ -696,7 +725,7 @@ export default function App() {
               </div>
               <div className="mt-3 min-h-7 text-sm" aria-live="polite">
                 {session.error ? (
-                  <span className="text-red-700">{session.error}</span>
+                  <span className="text-destructive">{session.error}</span>
                 ) : hints && !hidden ? (
                   <span className="text-emerald-800">
                     正确按键：{current?.answer.toUpperCase()}
@@ -715,37 +744,10 @@ export default function App() {
                 </Button>
               )}
               {session.lastAnswer && <Answer item={session.lastAnswer} />}
-            </div>
-            {page !== "practice" && !session.done && (
-              <div className="practice-config px-5 pb-5 sm:px-7">
-                <Setting
-                  label="答案提示"
-                  checked={hints}
-                  disabled={listenOnly}
-                  onChange={(v) => {
-                    setHints(v);
-                    if (v) dispatch({ type: "hint" });
-                  }}
-                />
-              </div>
-            )}
-            {page === "practice" && (
-              <div className="practice-config px-5 pb-5 sm:px-7">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  {!["initial", "zero"].includes(groupId) && (
-                    <Choice
-                      label="练习类型"
-                      value={practiceType}
-                      options={[
-                        ["syllable", "汉字拼写"],
-                        ["mapping", "韵母热身"],
-                      ]}
-                      onChange={(v) => {
-                        setPracticeType(v as PracticeType);
-                        start("practice", groupId, v as PracticeType);
-                      }}
-                    />
-                  )}
+            </FramePanel>
+            <FramePanel className="practice-controls">
+              {page !== "practice" && (
+                <div className="practice-config pb-4">
                   <Setting
                     label="答案提示"
                     checked={hints}
@@ -756,77 +758,106 @@ export default function App() {
                     }}
                   />
                 </div>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {group.keys.split("").map((k) => (
-                    <div className="group-key" key={k}>
-                      <kbd>{k.toUpperCase()}</kbd>
-                      <span>{groupId === "initial" ? INITIALS[k] : KEYMAP[k].join(" / ")}</span>
-                    </div>
-                  ))}
+              )}
+              {page === "practice" && (
+                <div className="practice-config pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    {!["initial", "zero"].includes(groupId) && (
+                      <Choice
+                        label="练习类型"
+                        value={practiceType}
+                        options={[
+                          ["syllable", "汉字拼写"],
+                          ["mapping", "韵母热身"],
+                        ]}
+                        onChange={(v) => {
+                          setPracticeType(v as PracticeType);
+                          start("practice", groupId, v as PracticeType);
+                        }}
+                      />
+                    )}
+                    <Setting
+                      label="答案提示"
+                      checked={hints}
+                      disabled={listenOnly}
+                      onChange={(v) => {
+                        setHints(v);
+                        if (v) dispatch({ type: "hint" });
+                      }}
+                    />
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {group.keys.split("").map((k) => (
+                      <div className="group-key" key={k}>
+                        <kbd>{k.toUpperCase()}</kbd>
+                        <span>{groupId === "initial" ? INITIALS[k] : KEYMAP[k].join(" / ")}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-6 text-stone-500">
+                    {["zero", "initial"].includes(groupId)
+                      ? group.description
+                      : "每轮 20 题，均衡覆盖组内韵母键；声母不限。"}
+                  </p>
                 </div>
-                <p className="mt-3 text-xs leading-6 text-stone-500">
-                  {["zero", "initial"].includes(groupId)
-                    ? group.description
-                    : "每轮 20 题，均衡覆盖组内韵母键；声母不限。"}
+              )}
+              <div className="audio-toolbar">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Icon name="sound" />
+                    朗读设置
+                  </div>
+                  <Choice
+                    label="题目呈现"
+                    disabledValues={voice.available ? [] : ["listen"]}
+                    value={listenOnly ? "listen" : "look"}
+                    options={[
+                      ["look", "看字练习"],
+                      ["listen", "听音练习"],
+                    ]}
+                    onChange={switchListening}
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={play}
+                    disabled={!voice.available || session.paused}
+                    className="h-8"
+                  >
+                    <Icon name="sound" />
+                    重听
+                  </Button>
+                  <Choice
+                    label="朗读速度"
+                    value={String(rate)}
+                    options={[
+                      ["0.65", "慢速"],
+                      ["0.8", "适中"],
+                      ["1", "正常"],
+                    ]}
+                    onChange={(v) => setAudioSettings((s) => ({ ...s, rate: Number(v) }))}
+                  />
+                  <Setting
+                    label="自动朗读"
+                    checked={autoRead}
+                    disabled={!voice.available}
+                    onChange={(v) => {
+                      setUnlocked(true);
+                      setAudioSettings((s) => ({ ...s, autoRead: v }));
+                    }}
+                  />
+                </div>
+                <p aria-live="polite" className="mt-2 text-xs leading-5 text-stone-600">
+                  {voice.message}
+                  {!voice.available && (
+                    <Button data-variant="ghost" onClick={() => SpeechCoach.refresh()}>
+                      重新检测
+                    </Button>
+                  )}
                 </p>
               </div>
-            )}
-            <div className="audio-toolbar mx-5 mb-5 sm:mx-7">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Icon name="sound" />
-                  朗读设置
-                </div>
-                <Choice
-                  label="题目呈现"
-                  disabledValues={voice.available ? [] : ["listen"]}
-                  value={listenOnly ? "listen" : "look"}
-                  options={[
-                    ["look", "看字练习"],
-                    ["listen", "听音练习"],
-                  ]}
-                  onChange={switchListening}
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={play}
-                  disabled={!voice.available || session.paused}
-                  className="h-8"
-                >
-                  <Icon name="sound" />
-                  重听
-                </Button>
-                <Choice
-                  label="朗读速度"
-                  value={String(rate)}
-                  options={[
-                    ["0.65", "慢速"],
-                    ["0.8", "适中"],
-                    ["1", "正常"],
-                  ]}
-                  onChange={(v) => setAudioSettings((s) => ({ ...s, rate: Number(v) }))}
-                />
-                <Setting
-                  label="自动朗读"
-                  checked={autoRead}
-                  disabled={!voice.available}
-                  onChange={(v) => {
-                    setUnlocked(true);
-                    setAudioSettings((s) => ({ ...s, autoRead: v }));
-                  }}
-                />
-              </div>
-              <p aria-live="polite" className="mt-2 text-xs leading-5 text-stone-600">
-                {voice.message}
-                {!voice.available && (
-                  <Button data-variant="ghost" onClick={() => SpeechCoach.refresh()}>
-                    重新检测
-                  </Button>
-                )}
-              </p>
-            </div>
-            <div className="session-stats">
+            </FramePanel>
+            <FramePanel className="session-stats">
               <div>
                 <span>正确率</span>
                 <strong>{session.attempts ? accuracy + "%" : "—"}</strong>
@@ -847,10 +878,10 @@ export default function App() {
                   <small> 题/分</small>
                 </strong>
               </div>
-            </div>
+            </FramePanel>
           </>
         )}
-      </section>
+      </Frame>
       <section className="panel mt-5 p-5 sm:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">让手指记住位置</h3>
@@ -879,6 +910,8 @@ export default function App() {
       onKeyDown={(event) => {
         if (
           event.key === "Escape" &&
+          !event.defaultPrevented &&
+          !(event.target as HTMLElement).closest("[popover]") &&
           focusMode &&
           !helpOpen &&
           !soundOpen &&
@@ -935,13 +968,28 @@ export default function App() {
                 {focusMode ? "退出专注" : "专注模式"}
               </Button>
             )}
-            <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+            <Dialog
+              open={soundOpen}
+              onOpenChange={(open, details) => {
+                focusAfterSound.current = !open && details.reason === "close-press";
+                setSoundOpen(open);
+              }}
+            >
               <DialogTrigger className="tool-trigger">
                 <Icon name="sound" />
                 击键声
               </DialogTrigger>
               <DialogBackdrop />
-              <DialogContent className="help-dialog">
+              <DialogContent
+                className="help-dialog"
+                finalFocus={() => {
+                  if (!focusAfterSound.current || !session || session.done || session.paused)
+                    return null;
+                  return (
+                    inputRef.current ?? document.querySelector<HTMLInputElement>(".shadow-input")
+                  );
+                }}
+              >
                 <DialogTitle>击键声音</DialogTitle>
                 <DialogDescription>选中音色即可试听。输错时会响起低音。</DialogDescription>
                 <div className="sound-setting">
@@ -1005,36 +1053,35 @@ export default function App() {
               <h1>{pages[page].title}</h1>
               <p className="mt-3 text-sm leading-7 text-stone-500">{pages[page].description}</p>
             </div>
+            {page === "practice" && (
+              <Dialog
+                open={groupOpen}
+                onOpenChange={(open) => {
+                  if (open) focusAfterGroup.current = false;
+                  setGroupOpen(open);
+                }}
+              >
+                <DialogTrigger className="group-switch">切换分组</DialogTrigger>
+                <DialogBackdrop />
+                <DialogContent
+                  className="group-dialog"
+                  initialFocus='[aria-current="step"]'
+                  finalFocus={() => (focusAfterGroup.current ? inputRef.current : null)}
+                >
+                  <DialogTitle>选择练习分组</DialogTitle>
+                  <DialogDescription>按键盘位置选一组，打勾表示已掌握。</DialogDescription>
+                  <div className="group-options">{groupButtons}</div>
+                  <DialogClose data-variant="ghost">取消</DialogClose>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
           {saveError && (
             <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900" role="alert">
               {saveError}
             </p>
           )}
-          {page === "practice" && (
-            <div className="course-grid">
-              {GROUPS.map((g, i) => (
-                <Button
-                  key={g.id}
-                  onClick={() => chooseGroup(g.id)}
-                  className="course-card"
-                  aria-current={groupId === g.id ? "step" : undefined}
-                >
-                  <span className="course-number">
-                    {isDone(g.id) ? "✓" : String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span>
-                    <strong>{g.label}</strong>
-                    <small>
-                      {g.id === "initial"
-                        ? "SH · CH · ZH"
-                        : g.keys.split("").join(" ").toUpperCase()}
-                    </small>
-                  </span>
-                </Button>
-              ))}
-            </div>
-          )}
+          {page === "practice" && <div className="course-grid">{groupButtons}</div>}
           {page === "rows" && session?.mode === "rows" && (
             <>
               <div className="mb-5 grid gap-2 sm:grid-cols-3" aria-label="盲打课程键位行">
@@ -1384,16 +1431,18 @@ export default function App() {
               </section>
             ))}
           {!session && page === "articles" && (
-            <div className="space-y-8">
-              <div className="panel p-4 sm:p-5">
-                <p className="mb-2 text-sm">
-                  文章练习进度{" "}
-                  <strong>
-                    已练习 {articleCount} / {ARTICLES.length} 篇
-                  </strong>
-                </p>
-                <Bar value={(articleCount / ARTICLES.length) * 100} label="文章练习完成度" />
-              </div>
+            <div className="flex flex-col gap-6">
+              <Frame>
+                <FramePanel>
+                  <p className="mb-2 text-sm">
+                    文章练习进度{" "}
+                    <strong>
+                      已练习 {articleCount} / {ARTICLES.length} 篇
+                    </strong>
+                  </p>
+                  <Bar value={(articleCount / ARTICLES.length) * 100} label="文章练习完成度" />
+                </FramePanel>
+              </Frame>
               <div className="library-tools">
                 <Input
                   type="search"
@@ -1425,60 +1474,58 @@ export default function App() {
                   </Button>
                 </div>
               )}
-              {articleCategories
-                .filter((tag) => foundArticles.some((article) => article.tag === tag))
-                .map((tag) => (
-                  <section key={tag}>
-                    <h2 className="mb-3 text-lg font-semibold">{tag}</h2>
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {foundArticles
-                        .filter((article) => article.tag === tag)
-                        .map((a) => (
-                          <article
-                            className="library-entry flex flex-col items-start p-5"
-                            key={a.id}
-                          >
-                            <div className="flex w-full items-baseline justify-between gap-3">
-                              <h3 className="text-base font-semibold">{a.title}</h3>
-                              <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-stone-600">
-                                <span>{a.syllables.split(" ").length} 字</span>
-                                {articleCompletion[a.id]?.articles || shadowCompleted.has(a.id) ? (
-                                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-900">
-                                    已练习
-                                  </span>
-                                ) : (
-                                  <span>未练习</span>
-                                )}
-                              </div>
+              {articleCategories.map((tag) => {
+                const articles = foundArticles.filter((article) => article.tag === tag);
+                if (!articles.length) return null;
+                return (
+                  <Frame stacked key={tag} spacing="sm">
+                    <FrameHeader>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-semibold">{tag}</h2>
+                        <Badge variant="secondary">{articles.length} 篇</Badge>
+                      </div>
+                    </FrameHeader>
+                    {articles.map((a) => (
+                      <FramePanel key={a.id}>
+                        <article className="library-row">
+                          <div className="grid min-w-0 gap-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold">{a.title}</h3>
+                              <span className="text-xs tabular-nums text-muted-foreground">
+                                {a.syllables.split(" ").length} 字
+                              </span>
+                              {articleCompletion[a.id]?.articles || shadowCompleted.has(a.id) ? (
+                                <Badge variant="success-light">已练习</Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">未练习</span>
+                              )}
                             </div>
                             {a.description && (
-                              <p className="mt-2 text-sm leading-6 text-stone-500">
-                                {a.description}
-                              </p>
+                              <p className="text-xs text-muted-foreground">{a.description}</p>
                             )}
-                            <blockquote className="my-4 line-clamp-3 text-sm leading-7 text-stone-600">
-                              {a.text}
-                            </blockquote>
-                            <div className="mt-auto flex flex-wrap gap-2">
-                              <Button
-                                data-variant="solid"
-                                onClick={() => start("articles", groupId, "syllable", a.id)}
-                              >
-                                练习《{a.title}》
-                              </Button>
-                              <Button
-                                data-variant="ghost"
-                                aria-label={`影子跟打《${a.title}》`}
-                                onClick={() => startShadow(a.id)}
-                              >
-                                影子跟打
-                              </Button>
-                            </div>
-                          </article>
-                        ))}
-                    </div>
-                  </section>
-                ))}
+                            <blockquote className="article-excerpt">{a.text}</blockquote>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              aria-label={`练习《${a.title}》`}
+                              onClick={() => start("articles", groupId, "syllable", a.id)}
+                            >
+                              逐字练习
+                            </Button>
+                            <Button
+                              data-variant="ghost"
+                              aria-label={`影子跟打《${a.title}》`}
+                              onClick={() => startShadow(a.id)}
+                            >
+                              影子跟打
+                            </Button>
+                          </div>
+                        </article>
+                      </FramePanel>
+                    ))}
+                  </Frame>
+                );
+              })}
             </div>
           )}
           <footer className="page-footer">

@@ -41,7 +41,9 @@ npm run preview
 
 - 点「专注模式」收起周边面板，按 Esc 返回。普通练习的虚拟键盘会标出刚按下的键。
 - 在文章练习与影子跟打中，第一键把光标移到字中间，第二键完成当前字，自动跳过标点。影子跟打可选 30、60、90 字/分的配速；完成后可重打同一篇，对照上次的实际击键记录。
-- 文章库支持按篇名、正文和专项音节搜索。「易混音专项」覆盖平翘舌、前后鼻音和零声母。
+- 文章库支持按篇名、正文和专项音节搜索。影子跟打也能直接查找文章，用方向键和回车选篇。
+- 窄屏下可用「切换分组」查看全部八组键位。
+- 「易混音专项」覆盖平翘舌、前后鼻音和零声母。
 - 顶栏「击键声」可试听木键或机械键，选择音量。默认静音，偏好保存在 `hexi-key-sound-v1`。按错键会发出低音。击键声使用浏览器 Web Audio，与普通话朗读独立。
 
 ## UI SDK
@@ -52,7 +54,7 @@ npm run preview
 
 `npm run skills:sync` 同步 `package.json#skills` 中声明的 UI SDK、cstack、agent-browser、Fallow 和 frontend-design，并下载 ReUI 官方 skill 文件包。Codex、Pi 和 agy 共用仓库内的 `.agents/skills/`。UI SDK skill 跟随安装的 `@ui-sdk/core` 版本，ReUI skill 的来源与版本记录在 `.agents/skills/reui/source.json`。
 
-`components.json` 配置了 `@reui` 注册表和 `base-nova` 风格，组件使用 `@/` 指向 `src/`。练习标题使用 `src/components/reui/badge.tsx`。添加组件时，在根目录运行 `npx shadcn@latest add @reui/<组件名>`。[ReUI 注册表](https://reui.io/docs/registry)
+`components.json` 配置了 `@reui` 注册表和 `base-nova` 风格，组件使用 `@/` 指向 `src/`。练习面板和文章分类列表使用 ReUI Frame，练习状态使用 Badge。添加组件时，在根目录运行 `npx shadcn@latest add @reui/<组件名>`。[ReUI 注册表](https://reui.io/docs/registry)
 
 ## ReUI MCP
 

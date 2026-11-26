@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@ui-sdk/react/button";
 import { Input } from "@ui-sdk/react/input";
+import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
+import { ShadowArticlePicker } from "./ShadowArticlePicker";
 import { ARTICLES } from "./data";
 import type { Session } from "./practice";
 import type { RowCourse } from "./row-course";
@@ -211,170 +213,163 @@ export function ShadowPractice({
           onReplay={toggleReplay}
         />
       )}
-      <section className="shadow-studio [overflow-anchor:none]">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          {course && sentence ? (
-            <div>
-              <h2 className="text-lg font-semibold">{course.label}短句</h2>
-              <p className="mt-1 text-sm text-stone-600">
-                本排击键 {sentence.hits} / {sentence.total} ·{" "}
-                {Math.round((sentence.hits / sentence.total) * 100)}%
-              </p>
-            </div>
-          ) : (
-            <label className="grid max-w-full gap-2 text-sm font-semibold">
-              跟打文章
-              <select
-                className="shadow-select"
-                value={article.id}
-                onChange={(event) => onArticle(event.target.value)}
-              >
-                {articleGroups.map(({ tag, articles }) => (
-                  <optgroup label={tag} key={tag}>
-                    {articles.map((item) => (
-                      <option value={item.id} key={item.id}>
-                        {item.title} · {completed.has(item.id) ? "已练习" : "未练习"}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-          )}
-          <div className="shadow-actions">
-            {!session.done && !course && (
-              <label className="guide-label">
-                影子节奏
-                <select
-                  className="shadow-select"
-                  value={guide}
-                  onChange={(event) => {
-                    setGuide(event.target.value);
-                    if (replayTime !== null) {
-                      setReplayTime(null);
-                      setElapsed(0);
-                    }
-                    inputRef.current?.focus({ preventScroll: true });
-                  }}
-                >
-                  <option value="off">关闭</option>
-                  {previous && <option value="last">上次记录</option>}
-                  {[30, 60, 90].map((rate) => (
-                    <option key={rate} value={rate}>
-                      {rate} 字/分
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {course && next && !session.done && (
-              <Button onClick={() => onArticle(next.id)}>换一句</Button>
-            )}
-            {replay && startTime === null && !session.done && (
-              <Button onClick={toggleReplay}>{isReplaying ? "停止回放" : "回放上次"}</Button>
-            )}
-            {!session.done && (
-              <Button data-variant="ghost" onClick={onRestart}>
-                {course ? "重打本句" : "重打这篇"}
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="stroke-metrics">
-          <span>
-            {session.index} / {session.items.length} 字
-          </span>
-          {replayTime === null && (
-            <>
-              <span>
-                <b>{session.done ? result.speed : (speed ?? "—")}</b> 字/分
-              </span>
-              <span>
-                击键准确率 <b>{result.keys ? Math.round(result.accuracy) + "%" : "—"}</b>
-              </span>
-            </>
-          )}
-          <span>
-            {replayTime !== null ? "回放" : "用时"}{" "}
-            {duration(replayTime !== null ? elapsed : session.done ? result.elapsed : elapsed)}
-          </span>
-        </div>
-        <div className="relative mt-4">
-          <Input
-            id={inputId}
-            ref={inputRef}
-            aria-label={course ? "盲打短句输入" : "影子跟打输入"}
-            className="shadow-input"
-            value={session.input}
-            onValueChange={(value, details) => {
-              const normalized = value.toLowerCase();
-              if (
-                !current ||
-                normalized === current.answer ||
-                !current.answer.startsWith(normalized)
-              ) {
-                details.cancel();
-              }
-              type(value);
-            }}
-            onPaste={(event) => event.preventDefault()}
-            onCompositionStart={() => {
-              composing.current = true;
-            }}
-            onCompositionEnd={(event) => {
-              composing.current = false;
-              if (/[^a-z]/i.test(event.data)) onInput(event.data);
-            }}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            maxLength={2}
-            disabled={session.done}
-          />
-          <label ref={passageRef} htmlFor={inputId} className="shadow-passage">
-            {glyphs}
-            {showGhost && replayIndex === session.items.length && (
-              <span
-                aria-hidden="true"
-                className="shadow-end"
-                data-glyph={session.items.length}
-                data-shadow-caret="0"
+      <Frame className="min-w-0 [overflow-anchor:none]">
+        <FrameHeader>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            {course && sentence ? (
+              <div>
+                <h2 className="text-lg font-semibold">{course.label}短句</h2>
+                <p className="mt-1 text-sm text-stone-600">
+                  本排击键 {sentence.hits} / {sentence.total} ·{" "}
+                  {Math.round((sentence.hits / sentence.total) * 100)}%
+                </p>
+              </div>
+            ) : (
+              <ShadowArticlePicker
+                article={article}
+                completed={completed}
+                onChoose={onArticle}
+                typingInput={inputRef}
               />
             )}
-            {!session.done && replayTime === null && (
-              <PassageCaret index={session.index} offset={session.input.length} />
-            )}
-            {showGhost && <PassageCaret index={replayIndex} offset={ghostOffset} ghost />}
-          </label>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-stone-600">
-          {!session.done && current && (
+            <div className="shadow-actions">
+              {!session.done && !course && (
+                <label className="guide-label">
+                  影子节奏
+                  {/* The short pace list uses the device picker and returns directly to typing. */}
+                  <select
+                    className="shadow-select"
+                    value={guide}
+                    onChange={(event) => {
+                      setGuide(event.target.value);
+                      if (replayTime !== null) {
+                        setReplayTime(null);
+                        setElapsed(0);
+                      }
+                      inputRef.current?.focus({ preventScroll: true });
+                    }}
+                  >
+                    <option value="off">关闭</option>
+                    {previous && <option value="last">上次记录</option>}
+                    {[30, 60, 90].map((rate) => (
+                      <option key={rate} value={rate}>
+                        {rate} 字/分
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {course && next && !session.done && (
+                <Button onClick={() => onArticle(next.id)}>换一句</Button>
+              )}
+              {replay && startTime === null && !session.done && (
+                <Button onClick={toggleReplay}>{isReplaying ? "停止回放" : "回放上次"}</Button>
+              )}
+              {!session.done && (
+                <Button data-variant="ghost" onClick={onRestart}>
+                  {course ? "重打本句" : "重打这篇"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </FrameHeader>
+        <FramePanel>
+          <div className="stroke-metrics">
             <span>
-              正在输入 <strong>{current.han}</strong>
-              {pinyinHints && current.py ? " · " + current.py : ""}
-              {session.input && <kbd className="ml-2">{session.input.toUpperCase()}</kbd>}
+              {session.index} / {session.items.length} 字
             </span>
-          )}
-          {showGhost && (
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-4 w-0.5 rounded bg-rose-600" />
-              {pace
-                ? `配速 ${pace} 字/分`
-                : replayTime === null
-                  ? "上次的影子"
-                  : "回放 " + duration(elapsed)}
-              {ghost && <kbd className={ghost.errors ? "text-rose-700" : ""}>{ghost.key}</kbd>}
+            {replayTime === null && (
+              <>
+                <span>
+                  <b>{session.done ? result.speed : (speed ?? "—")}</b> 字/分
+                </span>
+                <span>
+                  击键准确率 <b>{result.keys ? Math.round(result.accuracy) + "%" : "—"}</b>
+                </span>
+              </>
+            )}
+            <span>
+              {replayTime !== null ? "回放" : "用时"}{" "}
+              {duration(replayTime !== null ? elapsed : session.done ? result.elapsed : elapsed)}
             </span>
-          )}
-          {!course && !previous && !session.done && !pace && (
-            <span>完成本篇即可与自己的记录跟打。</span>
-          )}
-        </div>
-        <p className="mt-3 min-h-5 text-sm text-stone-600" role="status">
-          {session.error || (!session.done && "用英文键盘输入双拼，标点自动跳过。")}
-        </p>
-      </section>
+          </div>
+          <div className="relative mt-4">
+            <Input
+              id={inputId}
+              ref={inputRef}
+              aria-label={course ? "盲打短句输入" : "影子跟打输入"}
+              className="shadow-input"
+              value={session.input}
+              onValueChange={(value, details) => {
+                const normalized = value.toLowerCase();
+                if (
+                  !current ||
+                  normalized === current.answer ||
+                  !current.answer.startsWith(normalized)
+                ) {
+                  details.cancel();
+                }
+                type(value);
+              }}
+              onPaste={(event) => event.preventDefault()}
+              onCompositionStart={() => {
+                composing.current = true;
+              }}
+              onCompositionEnd={(event) => {
+                composing.current = false;
+                if (/[^a-z]/i.test(event.data)) onInput(event.data);
+              }}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              maxLength={2}
+              disabled={session.done}
+            />
+            <label ref={passageRef} htmlFor={inputId} className="shadow-passage">
+              {glyphs}
+              {showGhost && replayIndex === session.items.length && (
+                <span
+                  aria-hidden="true"
+                  className="shadow-end"
+                  data-glyph={session.items.length}
+                  data-shadow-caret="0"
+                />
+              )}
+              {!session.done && replayTime === null && (
+                <PassageCaret index={session.index} offset={session.input.length} />
+              )}
+              {showGhost && <PassageCaret index={replayIndex} offset={ghostOffset} ghost />}
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-stone-600">
+            {!session.done && current && (
+              <span>
+                正在输入 <strong>{current.han}</strong>
+                {pinyinHints && current.py ? " · " + current.py : ""}
+                {session.input && <kbd className="ml-2">{session.input.toUpperCase()}</kbd>}
+              </span>
+            )}
+            {showGhost && (
+              <span className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-4 w-0.5 rounded bg-rose-600" />
+                {pace
+                  ? `配速 ${pace} 字/分`
+                  : replayTime === null
+                    ? "上次的影子"
+                    : "回放 " + duration(elapsed)}
+                {ghost && <kbd className={ghost.errors ? "text-destructive" : ""}>{ghost.key}</kbd>}
+              </span>
+            )}
+            {!course && !previous && !session.done && !pace && (
+              <span>完成本篇即可与自己的记录跟打。</span>
+            )}
+          </div>
+          <p className="mt-3 min-h-5 text-sm text-stone-600" role="status">
+            {session.error || (!session.done && "用英文键盘输入双拼，标点自动跳过。")}
+          </p>
+        </FramePanel>
+      </Frame>
     </div>
   );
 }
