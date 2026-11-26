@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: { tsconfigPaths: true },
   build: { outDir: "build" },
   fmt: { ignorePatterns: ["dist/**", ".agents/**", "qa*.cjs", "package-lock.json"] },
   lint: {

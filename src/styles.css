@@ -2,6 +2,8 @@
 @import "tailwindcss";
 @import "@ui-sdk/core/web.css" layer(components);
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --font-sans: "Segoe UI", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", Consolas, monospace;
@@ -22,6 +24,15 @@
   --ui-font-sans: var(--font-sans);
   --ui-font-size: 0.875rem;
   --ui-destructive: #b42318;
+  --destructive-foreground: var(--color-red-800);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-900);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-900);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-900);
+  --invert: var(--color-zinc-900);
+  --invert-foreground: var(--color-zinc-50);
 }
 body {
   margin: 0;
@@ -271,14 +282,6 @@ button {
   border-radius: 15px;
   background: #fff;
   box-shadow: 0 3px 10px #253b2610;
-}
-.badge {
-  background: #edf3e7;
-  color: #4c663a;
-  padding: 5px 8px;
-  font-size: 10px;
-  border-radius: 4px;
-  white-space: nowrap;
 }
 .choice {
   display: inline-flex;
@@ -1102,4 +1105,48 @@ kbd {
     white-space: normal;
     line-height: 10px;
   }
+}
+
+.dark {
+  --destructive-foreground: var(--color-red-600);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-600);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-600);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-600);
+  --invert: var(--color-zinc-700);
+  --invert-foreground: var(--color-zinc-50);
+}
+
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-card: var(--ui-background);
+  --color-card-foreground: var(--ui-foreground);
+  --color-popover: var(--ui-background);
+  --color-popover-foreground: var(--ui-foreground);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-secondary: #edf3e7;
+  --color-secondary-foreground: #4c663a;
+  --color-accent: var(--ui-muted);
+  --color-accent-foreground: var(--ui-foreground);
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-ring);
+  --color-focus: var(--ui-ring);
+  --color-focus-foreground: var(--ui-primary-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-invert: var(--invert);
+  --color-invert-foreground: var(--invert-foreground);
 }

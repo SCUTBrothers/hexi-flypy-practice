@@ -10,7 +10,10 @@
     "noEmit": true,
     "allowJs": true,
     "allowImportingTsExtensions": true,
-    "types": ["node", "vite-plus/client"]
+    "types": ["node", "vite-plus/client"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

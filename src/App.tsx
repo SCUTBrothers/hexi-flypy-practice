@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from "@ui-sdk/react/dialog";
 import { Progress, ProgressTrack, ProgressIndicator } from "@ui-sdk/react/progress";
+import { Badge } from "@/components/reui/badge";
 import { ARTICLES, EXAMPLES, GROUPS, INITIALS, KEYMAP } from "./data";
 import {
   STORAGE,
@@ -454,7 +455,9 @@ export default function App() {
       <section className="panel overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-5 sm:px-7">
           <div className="flex items-center gap-3">
-            <span className="badge">{page === "practice" ? "专项练习" : pages[page].label}</span>
+            <Badge variant="secondary">
+              {page === "practice" ? "专项练习" : pages[page].label}
+            </Badge>
             <h2 className="text-base font-semibold">
               {page === "practice"
                 ? group.label

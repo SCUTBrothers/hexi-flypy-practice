@@ -2,3 +2,7 @@ node_modules/
 build/
 .vite/
 .DS_Store
+.env*
+!.env.example
+.agents/mcp_config.json
+.agents/.mcp-config-*/

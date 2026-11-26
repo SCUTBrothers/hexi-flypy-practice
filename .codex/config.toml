@@ -1,0 +1,3 @@
+[mcp_servers.reui]
+url = "https://mcp.reui.io"
+bearer_token_env_var = "REUI_MCP_TOKEN"

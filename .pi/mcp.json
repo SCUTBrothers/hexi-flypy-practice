@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "reui": {
+      "url": "https://mcp.reui.io",
+      "headers": {
+        "Authorization": "Bearer ${REUI_MCP_TOKEN}"
+      }
+    }
+  }
+}

@@ -1,12 +1,432 @@
 {
   "version": 2,
   "skills": {
-    "ui-sdk": {
-      "source": "vercel-labs/ui",
-      "commit": "06a7633f9543125163574d508a0bbdc3a173042d",
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
       "sourceType": "github",
-      "skillPath": "packages/core/skills/ui-sdk/SKILL.md",
-      "computedHash": "cabe635c8f279e77b50a265c499ea2e8ebd471574b96acfc61a11a147d553e6d"
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "a0dfac7503f69bcf529b2660fc79964064c4f179eb65695904ddc45fc0d99d20",
+      "via": "."
+    },
+    "architect": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/architect/SKILL.md",
+      "computedHash": "f3067a3ee42f0f49636a07970a50b4d7024ca58caedf97958cd68827ceabe895",
+      "via": "."
+    },
+    "architecture-review": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/architecture-review/SKILL.md",
+      "computedHash": "8ee5b2bbee5cdafaccaa60dd6912c346934954e217baaed71f90bc329572b421",
+      "via": "."
+    },
+    "arena": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/arena/SKILL.md",
+      "computedHash": "36ad73a32a6a1e0c776f41bd46a1e04707c6bfc22d5bdc76ed174042f544c3bf",
+      "via": "."
+    },
+    "automate-me": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/meta/automate-me/SKILL.md",
+      "computedHash": "f852e9706959301c785e83ce613804f0375c3c75cd70857a68811cbe0ffd224d",
+      "via": "."
+    },
+    "benchmark-checklist": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/benchmark-checklist/SKILL.md",
+      "computedHash": "8ee0f27cb1bb99e0dbcf29f015bac3cf22f59628aad650999cd655f4e2b30f15",
+      "via": "."
+    },
+    "blast-radius": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/blast-radius/SKILL.md",
+      "computedHash": "30c57753195afc41ce120c50fd7fa32ef81f7b1e2834aaf9468ae5ca951133fe",
+      "via": "."
+    },
+    "bro": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/bro/SKILL.md",
+      "computedHash": "e3b6f572fe91c2ac05c04170459060e3572ea6ebe1d9962d0b53807ca0cbaeb7",
+      "via": "."
+    },
+    "cargo-fallow": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/cargo-fallow/SKILL.md",
+      "computedHash": "62b30c838c569cfb0f2b728ab97d62f2d8f06b154ced0e2fc17635bc483ef7d8",
+      "via": "."
+    },
+    "cobe-help": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/orchestration/cobe-help/SKILL.md",
+      "computedHash": "2483da4670dc4d028eed78c24f6bb4326426348c7235f6b3511097e1c64d1758",
+      "via": "."
+    },
+    "cobe-mode": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/orchestration/cobe-mode/SKILL.md",
+      "computedHash": "b9cb22495ee98b940dacc4573025bc9b419f792bfcc751f85990945cdefac824",
+      "via": "."
+    },
+    "code-review": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/code-review/SKILL.md",
+      "computedHash": "ae49aee71e7a4162c090fee0252e4b48d1648a0df9ea2a79cc81b9aa82ae76ce",
+      "via": "."
+    },
+    "correct": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/meta/correct/SKILL.md",
+      "computedHash": "45e1c1def54e1d1dd41dc3c9e92ee7d56320a1a210d433878041fe37d3d13b3f",
+      "via": "."
+    },
+    "create-verification-skill": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/create-verification-skill/SKILL.md",
+      "computedHash": "b332bec0e856c081d84fde79599c267bb4ff12ca9c431cc3bf079b6bd3f66bad",
+      "via": "."
+    },
+    "diagnosing-bugs": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "computedHash": "d318d229015a4086c42d557d796e8f6b325c1065b0a16749967a4f24a39635e5",
+      "via": "."
+    },
+    "fallow": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow/SKILL.md",
+      "computedHash": "0665c857457e1bc861e836d834328d49f346f3fc1b58990d66070c1480f895e1",
+      "via": "."
+    },
+    "fallow-cloud-setup": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-cloud-setup/SKILL.md",
+      "computedHash": "02d0b4780d09d44c5672a15ee9c06b97ddd546e96c20dbba995e7523df2ad2a0",
+      "via": "."
+    },
+    "fallow-codex-onboarding": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-codex-onboarding/SKILL.md",
+      "computedHash": "d2d7a02d2022198226bc3a10c167a7a70280f7264987ab436eabc65b3c52e79b",
+      "via": "."
+    },
+    "fallow-mutation": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-mutation/SKILL.md",
+      "computedHash": "7f6232bd4bf09b62877b5fe07570b63623d30b20608520c0ead761ef79b9b6d4",
+      "via": "."
+    },
+    "fallow-review": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-review/SKILL.md",
+      "computedHash": "d7225ed4328b573e01d570a8bbee519a611e667d4833f300dcce45bc4eba8724",
+      "via": "."
+    },
+    "fallow-setup": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-setup/SKILL.md",
+      "computedHash": "e05f8e661e97b33f81ee92ef3d7ad6cbfbb997daf7cb5c0e2b2c2d49110e7afe",
+      "via": "."
+    },
+    "figure-it-out": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/orchestration/figure-it-out/SKILL.md",
+      "computedHash": "f8d7b32486deb61882c38cf8e5bd3acbbcdef2fd097f8d18eab8448ab4f8b812",
+      "via": "."
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c",
+      "via": "."
+    },
+    "grill-me": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/grill-me/SKILL.md",
+      "computedHash": "d747a475c7e4660163d728814a03fcaf5e41d58ceb12c479ffe4419cb0a76286",
+      "via": "."
+    },
+    "handoff": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/handoff/SKILL.md",
+      "computedHash": "5fca312f814449c1096421255438ae197112b2e24e670042c7b08379b4ebad24",
+      "via": "."
+    },
+    "how": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/how/SKILL.md",
+      "computedHash": "fe7f9330160ed455b78606b40a80847d71ae003ec96e70cf06a7eaf9965307b6",
+      "via": "."
+    },
+    "in-your-own-words": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/in-your-own-words/SKILL.md",
+      "computedHash": "4803ab53c64d25a7b2dada6be005bcc25f2f112e8a7485c0faefdce93d7b434d",
+      "via": "."
+    },
+    "interrogate": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/interrogate/SKILL.md",
+      "computedHash": "a11ea2b66e129928eec2d0f84108d4927c3bd027b849659a51697ca422db7d3f",
+      "via": "."
+    },
+    "ketchup": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/ketchup/SKILL.md",
+      "computedHash": "ac54cdde61b8ee7f23d3465692ab68aa877b837723583d8409114ccb0cd2a284",
+      "via": "."
+    },
+    "maintain-verification-skill": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/maintain-verification-skill/SKILL.md",
+      "computedHash": "f8f23e2b97cb1d4178af4923bb1cb9f35790c4c0d50d3f79feab31c04b318c30",
+      "via": "."
+    },
+    "no-comments": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/no-comments/SKILL.md",
+      "computedHash": "5319e1ff4c9a9685d5e082676a3653a4e3b71f4c2645ef77ce12fec341e30901",
+      "via": "."
+    },
+    "pr": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/pr/SKILL.md",
+      "computedHash": "f3825b22c1d6e630a6a1d1235e764c06514062ddc0fc0b5633316bbfa9d063ac",
+      "via": "."
+    },
+    "principle-boundary-discipline": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-boundary-discipline/SKILL.md",
+      "computedHash": "c0897221e063299943f4f8a3deffa4f5ec62d8d8ec04c3b7cc8530ab0f49f1fb",
+      "via": "."
+    },
+    "principle-encode-lessons-in-structure": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-encode-lessons-in-structure/SKILL.md",
+      "computedHash": "27eb4a17517ea1d728b00c4c5873a460bccaca4843db4d44e0bfe97cf4cbd3af",
+      "via": "."
+    },
+    "principle-fix-root-causes": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-fix-root-causes/SKILL.md",
+      "computedHash": "9bb05e4f41735f5ab9a7ed39a4c68b09cd2a5c2e376f67bec86907819d936af5",
+      "via": "."
+    },
+    "principle-foundational-thinking": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-foundational-thinking/SKILL.md",
+      "computedHash": "79b763522944e59e9063b161c5ef8b2b4333e7d771c5e28585f4300601a844ca",
+      "via": "."
+    },
+    "principle-laziness-protocol": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-laziness-protocol/SKILL.md",
+      "computedHash": "f8d2af22c40bf854d795f6acf975128bd1d43ec1d90fd296d43acb915836b4f3",
+      "via": "."
+    },
+    "principle-never-block-on-the-human": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-never-block-on-the-human/SKILL.md",
+      "computedHash": "7f1aff0b23af0cf5b8ed67eaa7664d4960c3887ce41a01204f5f7521b8e2217a",
+      "via": "."
+    },
+    "principle-prove-it-works": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-prove-it-works/SKILL.md",
+      "computedHash": "c0c8d55e7b433ab3fb5f609c94ffcebd8f5a24ecb441ba682579e9e1258d36e5",
+      "via": "."
+    },
+    "principle-redesign-from-first-principles": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-redesign-from-first-principles/SKILL.md",
+      "computedHash": "4acf031f1ca469a74d971ffb7696c22790578e401e723b5d86585dd7d213a225",
+      "via": "."
+    },
+    "principle-separate-before-serializing-shared-state": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-separate-before-serializing-shared-state/SKILL.md",
+      "computedHash": "766b192d6f5148f82fb98f5ff395423aa825cbb5d015625d873fbdb5d381d5dd",
+      "via": "."
+    },
+    "principle-sequence-verifiable-units": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-sequence-verifiable-units/SKILL.md",
+      "computedHash": "4922491a33e4abe3036cefcff14546838d54a044c63a503afb15fe6da54f4112",
+      "via": "."
+    },
+    "principle-type-system-discipline": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/principles/principle-type-system-discipline/SKILL.md",
+      "computedHash": "fc6620616564a12529b784bbc1ff6fa7b315b0431e995528f75101b88a6a2d5a",
+      "via": "."
+    },
+    "prototype": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/prototype/SKILL.md",
+      "computedHash": "ade66abd24b9764fef642fe06a1892ed2176670ae12c1aa1fba8edf5b3a0e533",
+      "via": "."
+    },
+    "recall": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/recall/SKILL.md",
+      "computedHash": "75e0c92cc1e4efb43bff7652d80cb0ca870f379754d00bb53d5ecb09d5d9276b",
+      "via": "."
+    },
+    "reflect": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/meta/reflect/SKILL.md",
+      "computedHash": "66696d288aa5bde3eb55a1bbb809005be789b0a2c248804b0ab176cfee67dda3",
+      "via": "."
+    },
+    "reframe": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/reframe/SKILL.md",
+      "computedHash": "b5d7f773ec05274a84aa8f952849ecc621ac9a866cff4489f109468f9b60cd99",
+      "via": "."
+    },
+    "run-ticket": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/run-ticket/SKILL.md",
+      "computedHash": "72027f35a5aebffb9fc388885000b8c259a3628e53d4eb6407b3d255f6855d7f",
+      "via": "."
+    },
+    "sharpen": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/sharpen/SKILL.md",
+      "computedHash": "2b30f67a85a31441bbb961919c04b5416437e34bee4a33a07f3c1577432b3bdf",
+      "via": "."
+    },
+    "show-me-your-work": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/meta/show-me-your-work/SKILL.md",
+      "computedHash": "7000ed579fe5a73a2d84ef34689b406dbc70ef0f06d089e4e42885c299f80e6c",
+      "via": "."
+    },
+    "swarm": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/swarm/SKILL.md",
+      "computedHash": "82d786bd8e4d9d25dcafdeb3de7fdc8ed6fa732492dae0f77937c4826672d4a3",
+      "via": "."
+    },
+    "tdd": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "08eaf65841a713a92d89acf4db6b2257730308f9dea4855eb5694bcd67d4cc24",
+      "via": "."
+    },
+    "teach": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/teach/SKILL.md",
+      "computedHash": "4f1d2240a27c252f29214087bb60aaf71dc26f7bd3d35a483c72d90498910810",
+      "via": "."
+    },
+    "technical-writing": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/technical-writing/SKILL.md",
+      "computedHash": "7b312e5633063886739db988baa6f76c6b18673c7c73364d35a01f60751e3c00",
+      "via": "."
+    },
+    "to-spec": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/to-spec/SKILL.md",
+      "computedHash": "0faacb289df5d62cffd3845ac7b985b51190e8c32f6d536b25be024d18f20542",
+      "via": "."
+    },
+    "to-tickets": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/design/to-tickets/SKILL.md",
+      "computedHash": "43bce8fb69a85439c7e0dea08018afbdfbf2cb4eefce82277b532fc101dc6233",
+      "via": "."
+    },
+    "typescript-best-practices": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/typescript-best-practices/SKILL.md",
+      "computedHash": "443d7d133bc4154af24b800b169d6a58d482e2addfaa7f97529ef5acdd9604cd",
+      "via": "."
+    },
+    "ui-sdk": {
+      "source": "@ui-sdk/core",
+      "sourceType": "node_modules",
+      "skillPath": "skills/ui-sdk/SKILL.md",
+      "version": "0.1.0-beta.13",
+      "computedHash": "9a60caf01da3d47beedf627bf1505d922dccc93b04f294c6aa64edf01c46b3ba"
+    },
+    "unslop": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/communication/unslop/SKILL.md",
+      "computedHash": "09be986b4693324ce0635e2f9f2e436c6f3ca22c2a48a1f5933cc785e2f872a7",
+      "via": "."
+    },
+    "why": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/understanding/why/SKILL.md",
+      "computedHash": "f2cf429ec62b8b8ddcada3c5b37837ad8c5fb5e930df4b1050a38cd428e95ac3",
+      "via": "."
+    },
+    "writing-for-agents": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/meta/writing-for-agents/SKILL.md",
+      "computedHash": "e9ea2b6056b879496ba2074d280eb6f5e8074f6fa962e9d1636ef6810a5b69c3",
+      "via": "."
     }
   }
 }

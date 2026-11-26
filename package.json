@@ -4,17 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
+    "dev": "portless run vp dev",
     "build": "vp build",
     "check": "vp check",
     "test": "vp test run",
     "typecheck": "tsc --noEmit",
     "preview": "vp preview",
-    "test:legacy": "node qa.cjs && node qa-audio.cjs"
+    "test:legacy": "node qa.cjs && node qa-audio.cjs",
+    "dev:direct": "vp dev",
+    "skills:sync": "skills experimental_sync -a codex --copy -y && node scripts/sync-reui-skill.mjs",
+    "mcp:sync": "node scripts/sync-mcp-config.mjs"
   },
   "dependencies": {
+    "@base-ui/react": "^1.9.0",
     "@ui-sdk/core": "^0.1.0-beta.13",
     "@ui-sdk/react": "^0.1.0-beta.13",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.5.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -27,6 +33,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "jsdom": "^31.0.1",
+    "skills": "1.8.1",
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
     "vite-plus": "1.7.0"
@@ -37,5 +44,26 @@
   "engines": {
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
-  "packageManager": "npm@12.0.2"
+  "packageManager": "npm@12.0.2",
+  "skills": [
+    "npm:@ui-sdk/core",
+    {
+      "source": "SCUTBrothers/cstack"
+    },
+    {
+      "source": "vercel-labs/agent-browser",
+      "skills": [
+        "agent-browser"
+      ]
+    },
+    {
+      "source": "fallow-rs/fallow-skills"
+    },
+    {
+      "source": "anthropics/skills",
+      "skills": [
+        "frontend-design"
+      ]
+    }
+  ]
 }
