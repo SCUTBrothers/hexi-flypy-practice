@@ -1,5 +1,7 @@
 # 鹤习 · 小鹤双拼练习
 
+[在线练习小鹤双拼](https://scutbrothers.github.io/hexi-flypy-practice/)
+
 React 19、UI SDK、ReUI 和 Tailwind CSS 4，使用 Vite+ 1.7.0 和 npm。
 
 ## 本地开发
@@ -16,6 +18,8 @@ npm run dev
 需要直接使用 Vite+ 时，运行 `npm run dev:direct`。[Portless 使用说明](https://github.com/vercel-labs/portless)
 
 ## 验证与构建
+
+GitHub Actions 会在提交到 `main` 或向 `main` 发起 PR 时运行检查、测试和构建。`main` 验证通过后，工作流会将 `build/` 发布到 GitHub Pages。
 
 ```sh
 npm run check
