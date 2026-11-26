@@ -31,6 +31,14 @@ import {
   type PracticeType,
 } from "./practice";
 import { SpeechCoach } from "./speech";
+import {
+  playKeySound,
+  readKeySound,
+  soundPreference,
+  type KeySound,
+  type KeyVoice,
+} from "./key-sound";
+import { ArticleLine } from "./ArticleLine";
 import { ShadowPractice } from "./ShadowPractice";
 import { ROW_COURSES, type RowCourse } from "./row-course";
 
@@ -38,8 +46,8 @@ const pages: Record<Page, { label: string; icon: string; title: string; descript
   practice: {
     label: "进阶练习",
     icon: "grid",
-    title: "每一次敲击，都更熟悉一点。",
-    description: "按组记忆，用汉字串起声母与韵母。慢慢来，每天进步一点。",
+    title: "分组练习",
+    description: "选一组键位，练习 20 题。每个汉字输入两键。",
   },
   rows: {
     label: "盲打课程",
@@ -50,32 +58,32 @@ const pages: Record<Page, { label: string; icon: string; title: string; descript
   layout: {
     label: "键位速查",
     icon: "keyboard",
-    title: "把每一个音，放回键盘。",
+    title: "键位速查",
     description: "先认识，再记住。点击键位查看韵母、声母和例字。",
   },
   random: {
     label: "随机练习",
     icon: "shuffle",
-    title: "让熟悉的键，自然出现。",
+    title: "随机练习",
     description: "打乱顺序，在变化里检验你的记忆。每轮 30 题。",
   },
   mistakes: {
     label: "错题本",
     icon: "book",
-    title: "把不熟悉，练成熟悉。",
+    title: "错题本",
     description: "错误会自动收集；同一道题连续独立答对 3 次，就会移出错题本。",
   },
   articles: {
     label: "文章练习",
     icon: "text",
-    title: "在文字之间，找到节奏。",
-    description: "从一个音到一句话。逐字输入双拼，标点自动跳过。",
+    title: "文章练习",
+    description: "选择文章逐字练习，或用影子跟打对照自己的速度。标点自动跳过。",
   },
   shadow: {
     label: "影子跟打",
     icon: "text",
-    title: "跟着上一次的自己打",
-    description: "直接在原文上练双拼。重打同一篇时，红色光标会跟随上一次的按键节奏。",
+    title: "影子跟打",
+    description: "每字两键。绿线随你的输入移动，红线标记目标配速或上次记录。",
   },
 };
 const keyRoleLabels: Record<KeyRole, string> = { initial: "声母", final: "韵母", zero: "零声母" };
@@ -206,10 +214,12 @@ function Bar({ value, label }: { value: number; label: string }) {
 function Keyboard({
   selected = "",
   active = "",
+  pressed,
   onKey,
 }: {
   selected?: string;
   active?: string;
+  pressed?: { key: string; wrong: boolean };
   onKey: (k: string) => void;
 }) {
   return (
@@ -222,6 +232,7 @@ function Keyboard({
               className="keycap"
               data-selected={selected.includes(k) || undefined}
               data-active={active === k || undefined}
+              data-press={pressed?.key === k ? (pressed.wrong ? "wrong" : "hit") : undefined}
               onClick={() => onKey(k)}
               aria-label={`${k.toUpperCase()} 键，韵母 ${KEYMAP[k].join("、")}${INITIALS[k] ? "，声母 " + INITIALS[k] : ""}`}
             >
@@ -299,8 +310,26 @@ export default function App() {
   const [voice, setVoice] = useState(SpeechCoach.snapshot);
   const [selectedKey, setSelectedKey] = useState("q");
   const [saveError, setSaveError] = useState("");
+  const [keySound, setKeySound] = useState(readKeySound);
+  const [soundOpen, setSoundOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [pressed, setPressed] = useState<{ key: string; wrong: boolean }>();
+  const releaseKey = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [search, setSearch] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [articleCategory, setArticleCategory] = useState("全部");
+  const query = search.trim().toLowerCase();
+  const foundArticles =
+    page === "articles" && !session
+      ? ARTICLES.filter(
+          (article) =>
+            (articleCategory === "全部" || article.tag === articleCategory) &&
+            (!query ||
+              [article.title, article.text, article.description, article.tag].some((field) =>
+                field.toLowerCase().includes(query),
+              )),
+        )
+      : [];
   const [shadowArticleId, setShadowArticleId] = useState(ARTICLES[0].id);
   const [shadowRound, setShadowRound] = useState(0);
   const [showAllKeyStats, setShowAllKeyStats] = useState(false);
@@ -360,7 +389,8 @@ export default function App() {
       session.mode !== "shadow" &&
       !session.paused &&
       !session.done &&
-      !helpOpen
+      !helpOpen &&
+      !soundOpen
     )
       SpeechCoach.speak(audioItem(session.items[session.index]), rate);
     return () => SpeechCoach.stop();
@@ -374,6 +404,7 @@ export default function App() {
     session?.paused,
     session?.done,
     helpOpen,
+    soundOpen,
   ]);
   function start(mode: Page, id = groupId, type = practiceType, articleId?: string) {
     SpeechCoach.stop();
@@ -414,8 +445,40 @@ export default function App() {
     setPracticeType("syllable");
     start("practice", id, "syllable");
   }
+  useEffect(() => () => clearTimeout(releaseKey.current), []);
+  function changeSound(next: KeySound) {
+    setKeySound(next);
+    try {
+      localStorage.setItem(soundPreference, JSON.stringify(next));
+    } catch {
+      // Storage can be disabled in a private browsing session.
+    }
+    playKeySound(next);
+  }
+  function toggleFocus() {
+    setFocusMode((enabled) => !enabled);
+    (inputRef.current ?? document.querySelector<HTMLInputElement>(".shadow-input"))?.focus({
+      preventScroll: true,
+    });
+  }
   function submit(value: string) {
     if (composing.current) return;
+    const letters = value.toLowerCase();
+    if (
+      current &&
+      session &&
+      !session.done &&
+      !session.paused &&
+      /^[a-z]{1,2}$/.test(letters) &&
+      letters !== session.input &&
+      !session.input.startsWith(letters)
+    ) {
+      const wrong = !current.answer.startsWith(letters);
+      playKeySound(keySound, wrong);
+      setPressed({ key: letters.at(-1)!, wrong });
+      clearTimeout(releaseKey.current);
+      releaseKey.current = setTimeout(() => setPressed(undefined), 125);
+    }
     if (hints && session && !session.revealed) dispatch({ type: "reveal" });
     dispatch({ type: "input", value, now: Date.now(), day: today() });
   }
@@ -452,7 +515,7 @@ export default function App() {
   }
   const practicePanel = session && page !== "shadow" && page !== "rows" && (
     <>
-      <section className="panel overflow-hidden">
+      <section className="panel practice-stage overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-5 sm:px-7">
           <div className="flex items-center gap-3">
             <Badge variant="secondary">
@@ -487,61 +550,6 @@ export default function App() {
             </Button>
           </div>
         </div>
-        {page !== "practice" && !session.done && (
-          <div className="px-5 pt-5 sm:px-7">
-            <Setting
-              label="答案提示"
-              checked={hints}
-              disabled={listenOnly}
-              onChange={(v) => {
-                setHints(v);
-                if (v) dispatch({ type: "hint" });
-              }}
-            />
-          </div>
-        )}
-        {page === "practice" && (
-          <div className="px-5 pt-5 sm:px-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              {!["initial", "zero"].includes(groupId) && (
-                <Choice
-                  label="练习类型"
-                  value={practiceType}
-                  options={[
-                    ["syllable", "汉字拼写"],
-                    ["mapping", "韵母热身"],
-                  ]}
-                  onChange={(v) => {
-                    setPracticeType(v as PracticeType);
-                    start("practice", groupId, v as PracticeType);
-                  }}
-                />
-              )}
-              <Setting
-                label="答案提示"
-                checked={hints}
-                disabled={listenOnly}
-                onChange={(v) => {
-                  setHints(v);
-                  if (v) dispatch({ type: "hint" });
-                }}
-              />
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {group.keys.split("").map((k) => (
-                <div className="group-key" key={k}>
-                  <kbd>{k.toUpperCase()}</kbd>
-                  <span>{groupId === "initial" ? INITIALS[k] : KEYMAP[k].join(" / ")}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs leading-6 text-stone-500">
-              {["zero", "initial"].includes(groupId)
-                ? group.description
-                : "每轮 20 题，均衡覆盖组内韵母键；声母不限。"}
-            </p>
-          </div>
-        )}
         {session.done ? (
           <div className="result px-6 py-12 text-center">
             <div className="result-seal">✓</div>
@@ -569,11 +577,205 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className="audio-toolbar mx-5 mt-5 sm:mx-7">
+            <div className="question-area px-5 py-7 text-center sm:px-7">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+                <span>
+                  本轮进度{" "}
+                  <strong className="ml-2 text-stone-700">
+                    {session.index + 1} / {session.items.length}
+                  </strong>
+                </span>
+                {current?.kind === "syllable" && (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Setting label="拼音提示" checked={pinyinHints} onChange={setPinyinHints} />
+                    <Setting label="声韵母提示" checked={soundHints} onChange={setSoundHints} />
+                  </div>
+                )}
+                <Button
+                  data-variant="ghost"
+                  onClick={() => {
+                    dispatch({ type: "pause" });
+                    SpeechCoach.stop();
+                  }}
+                  className="h-7"
+                >
+                  {session.paused ? "继续练习" : "暂停练习"}
+                </Button>
+              </div>
+              <Bar label="本轮完成进度" value={(session.index / session.items.length) * 100} />
+              {page === "articles" && (
+                <ArticleLine
+                  text={ARTICLES.find((item) => item.id === session.articleId)!.text}
+                  index={session.index}
+                  offset={session.input.length}
+                  listenOnly={listenOnly}
+                />
+              )}
+              <div className="prompt-glyph">
+                {session.paused ? (
+                  <>
+                    <div className="question-word text-4xl">稍作休息</div>
+                    <p className="mt-5 text-sm text-stone-500">准备好了，再继续。</p>
+                  </>
+                ) : hidden ? (
+                  <>
+                    <div className="listening-orb">
+                      <Icon name="sound" />
+                    </div>
+                    <p className="mt-4 text-sm text-stone-600">听一听，输入这个音的双拼</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="question-word" data-testid="question">
+                      {current?.han || current?.prompt}
+                    </div>
+                    {current?.py && pinyinHints && (
+                      <p
+                        className="mt-2 font-mono text-xl tracking-widest text-stone-600"
+                        data-testid="pinyin"
+                      >
+                        {current?.py}
+                      </p>
+                    )}
+                    {current?.py && soundHints && (
+                      <p className="mt-3 text-xs text-stone-500" data-testid="sound-hints">
+                        {sounds(current).initial ? (
+                          <>
+                            声母 <b>{sounds(current).initial}</b>
+                            <span className="mx-3 text-stone-300">/</span>韵母{" "}
+                            <b>{sounds(current).final}</b>
+                          </>
+                        ) : (
+                          `零声母音节 ${current.py}`
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+              <Field className="mx-auto mt-6 max-w-64">
+                <FieldLabel className="sr-only">双拼输入</FieldLabel>
+                <Input
+                  ref={inputRef}
+                  value={session.input}
+                  onValueChange={(value, details) => {
+                    const letters = value.toLowerCase();
+                    if (
+                      current &&
+                      (letters === current.answer || !current.answer.startsWith(letters))
+                    )
+                      details.cancel();
+                    submit(value);
+                  }}
+                  disabled={session.paused}
+                  onCompositionStart={() => {
+                    composing.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    composing.current = false;
+                    submit("中文");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === " " && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      play();
+                    }
+                  }}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder={current?.kind === "mapping" ? "输入韵母键" : "输入两位字母"}
+                  data-mistyped={!!session.error || undefined}
+                  data-partial={!!session.input || undefined}
+                  className="typing-input"
+                />
+              </Field>
+              <div className="code-steps" aria-hidden="true">
+                <i data-filled={!!session.input || undefined} />
+                {current?.answer.length === 2 && <i />}
+              </div>
+              <div className="mt-3 min-h-7 text-sm" aria-live="polite">
+                {session.error ? (
+                  <span className="text-red-700">{session.error}</span>
+                ) : hints && !hidden ? (
+                  <span className="text-emerald-800">
+                    正确按键：{current?.answer.toUpperCase()}
+                  </span>
+                ) : (
+                  <span className="text-stone-500">英文输入法 · 空格重听 · 输入后自动继续</span>
+                )}
+              </div>
+              {hidden && (
+                <Button
+                  data-variant="ghost"
+                  className="mt-1 text-xs"
+                  onClick={() => dispatch({ type: "reveal" })}
+                >
+                  查看题目提示
+                </Button>
+              )}
+              {session.lastAnswer && <Answer item={session.lastAnswer} />}
+            </div>
+            {page !== "practice" && !session.done && (
+              <div className="practice-config px-5 pb-5 sm:px-7">
+                <Setting
+                  label="答案提示"
+                  checked={hints}
+                  disabled={listenOnly}
+                  onChange={(v) => {
+                    setHints(v);
+                    if (v) dispatch({ type: "hint" });
+                  }}
+                />
+              </div>
+            )}
+            {page === "practice" && (
+              <div className="practice-config px-5 pb-5 sm:px-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {!["initial", "zero"].includes(groupId) && (
+                    <Choice
+                      label="练习类型"
+                      value={practiceType}
+                      options={[
+                        ["syllable", "汉字拼写"],
+                        ["mapping", "韵母热身"],
+                      ]}
+                      onChange={(v) => {
+                        setPracticeType(v as PracticeType);
+                        start("practice", groupId, v as PracticeType);
+                      }}
+                    />
+                  )}
+                  <Setting
+                    label="答案提示"
+                    checked={hints}
+                    disabled={listenOnly}
+                    onChange={(v) => {
+                      setHints(v);
+                      if (v) dispatch({ type: "hint" });
+                    }}
+                  />
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {group.keys.split("").map((k) => (
+                    <div className="group-key" key={k}>
+                      <kbd>{k.toUpperCase()}</kbd>
+                      <span>{groupId === "initial" ? INITIALS[k] : KEYMAP[k].join(" / ")}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-6 text-stone-500">
+                  {["zero", "initial"].includes(groupId)
+                    ? group.description
+                    : "每轮 20 题，均衡覆盖组内韵母键；声母不限。"}
+                </p>
+              </div>
+            )}
+            <div className="audio-toolbar mx-5 mb-5 sm:mx-7">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Icon name="sound" />
-                  听见，也记住
+                  朗读设置
                 </div>
                 <Choice
                   label="题目呈现"
@@ -624,136 +826,6 @@ export default function App() {
                 )}
               </p>
             </div>
-            <div className="question-area px-5 py-7 text-center sm:px-7">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
-                <span>
-                  本轮进度{" "}
-                  <strong className="ml-2 text-stone-700">
-                    {session.index + 1} / {session.items.length}
-                  </strong>
-                </span>
-                {current?.kind === "syllable" && (
-                  <div className="flex flex-wrap items-center gap-4">
-                    <Setting label="拼音提示" checked={pinyinHints} onChange={setPinyinHints} />
-                    <Setting label="声韵母提示" checked={soundHints} onChange={setSoundHints} />
-                  </div>
-                )}
-                <Button
-                  data-variant="ghost"
-                  onClick={() => {
-                    dispatch({ type: "pause" });
-                    SpeechCoach.stop();
-                  }}
-                  className="h-7"
-                >
-                  {session.paused ? "继续练习" : "暂停练习"}
-                </Button>
-              </div>
-              <Bar label="本轮完成进度" value={(session.index / session.items.length) * 100} />
-              {page === "articles" && (
-                <p className="article-line">
-                  {session.items.map((item, index) => (
-                    <span
-                      key={`${item.id}-${index}`}
-                      data-current={index === session.index || undefined}
-                      data-finished={index < session.index || undefined}
-                    >
-                      {listenOnly && index >= session.index ? "·" : item.han}
-                    </span>
-                  ))}
-                </p>
-              )}
-              <div className="mt-8 min-h-34">
-                {session.paused ? (
-                  <>
-                    <div className="question-word text-4xl">稍作休息</div>
-                    <p className="mt-5 text-sm text-stone-500">准备好了，再继续。</p>
-                  </>
-                ) : hidden ? (
-                  <>
-                    <div className="listening-orb">
-                      <Icon name="sound" />
-                    </div>
-                    <p className="mt-4 text-sm text-stone-600">听一听，输入这个音的双拼</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="question-word" data-testid="question">
-                      {current?.han || current?.prompt}
-                    </div>
-                    {current?.py && pinyinHints && (
-                      <p
-                        className="mt-2 font-mono text-xl tracking-widest text-stone-600"
-                        data-testid="pinyin"
-                      >
-                        {current?.py}
-                      </p>
-                    )}
-                    {current?.py && soundHints && (
-                      <p className="mt-3 text-xs text-stone-500" data-testid="sound-hints">
-                        {sounds(current).initial ? (
-                          <>
-                            声母 <b>{sounds(current).initial}</b>
-                            <span className="mx-3 text-stone-300">/</span>韵母{" "}
-                            <b>{sounds(current).final}</b>
-                          </>
-                        ) : (
-                          `零声母音节 ${current.py}`
-                        )}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-              <Field className="mx-auto mt-6 max-w-64">
-                <FieldLabel className="sr-only">双拼输入</FieldLabel>
-                <Input
-                  ref={inputRef}
-                  value={session.input}
-                  onValueChange={submit}
-                  disabled={session.paused}
-                  onCompositionStart={() => {
-                    composing.current = true;
-                  }}
-                  onCompositionEnd={() => {
-                    composing.current = false;
-                    submit("中文");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === " " && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      play();
-                    }
-                  }}
-                  autoComplete="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  placeholder={current?.kind === "mapping" ? "输入韵母键" : "输入两位字母"}
-                  className="typing-input"
-                />
-              </Field>
-              <div className="mt-3 min-h-7 text-sm" aria-live="polite">
-                {session.error ? (
-                  <span className="text-red-700">{session.error}</span>
-                ) : hints && !hidden ? (
-                  <span className="text-emerald-800">
-                    正确按键：{current?.answer.toUpperCase()}
-                  </span>
-                ) : (
-                  <span className="text-stone-500">英文输入法 · 空格重听 · 输入后自动继续</span>
-                )}
-              </div>
-              {hidden && (
-                <Button
-                  data-variant="ghost"
-                  className="mt-1 text-xs"
-                  onClick={() => dispatch({ type: "reveal" })}
-                >
-                  查看题目提示
-                </Button>
-              )}
-              {session.lastAnswer && <Answer item={session.lastAnswer} />}
-            </div>
             <div className="session-stats">
               <div>
                 <span>正确率</span>
@@ -788,6 +860,7 @@ export default function App() {
           </p>
         </div>
         <Keyboard
+          pressed={pressed}
           selected={page === "practice" ? group.keys : ""}
           active={hints && !hidden && !session.done ? current?.answer[session.input.length] : ""}
           onKey={(k) => {
@@ -800,7 +873,21 @@ export default function App() {
     </>
   );
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-focus={focusMode && session ? "on" : undefined}
+      onKeyDown={(event) => {
+        if (
+          event.key === "Escape" &&
+          focusMode &&
+          !helpOpen &&
+          !soundOpen &&
+          !event.nativeEvent.isComposing
+        ) {
+          setFocusMode(false);
+        }
+      }}
+    >
       <aside className="sidebar">
         <a
           href="#practice"
@@ -817,7 +904,7 @@ export default function App() {
             鹤习<small>小鹤双拼练习</small>
           </span>
         </a>
-        <p className="nav-caption">每天一点，慢慢熟练</p>
+
         <nav aria-label="主要导航">
           {(Object.keys(pages) as Page[]).map((p) => (
             <Button
@@ -831,64 +918,92 @@ export default function App() {
               {p === "mistakes" && mistakes.length > 0 && (
                 <span className="count">{mistakes.length}</span>
               )}
-              {p === "practice" && <span className="nav-dot" />}
             </Button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <Icon name="leaf" />
-          <p>
-            不必着急，
-            <br />
-            熟悉是重复的礼物。
-          </p>
-          <div>小鹤双拼 · FLYPY</div>
-        </div>
       </aside>
       <div className="min-w-0 flex-1">
         <header className="topbar">
           <div className="flex items-center gap-3 text-xs text-stone-500">
-            <span>我的学习空间</span>
+            <span>小鹤双拼</span>
             <span className="text-stone-300">/</span>
             <span className="text-stone-800">{pages[page].label}</span>
           </div>
-          <Dialog
-            open={helpOpen}
-            onOpenChange={(v) => {
-              setHelpOpen(v);
-              if (v) SpeechCoach.stop();
-            }}
-          >
-            <DialogTrigger className="help-trigger">
-              练习指南 <span aria-hidden="true">↗</span>
-            </DialogTrigger>
-            <DialogBackdrop />
-            <DialogContent className="help-dialog">
-              <DialogTitle>练习指南</DialogTitle>
-              <DialogDescription>先听音、拆拼音，再回想韵母所在的键。</DialogDescription>
-              <ol className="my-5 list-decimal space-y-3 pl-5 text-sm leading-7">
-                <li>切换到英文输入法。每个汉字输入两位字母，答对自动进入下一题。</li>
-                <li>按组熟悉韵母键，再试随机练习和文章。组内声母不限。</li>
-                <li>听音模式隐藏题目；空格可以重听，查看提示后本轮不会点亮分组。</li>
-                <li>错题连续独立答对三次自动移出。进度保存在当前浏览器，换设备不会自动同步。</li>
-                <li>朗读使用设备的普通话语音；如果没有中文语音，仍可进行看字练习。</li>
-              </ol>
-              <DialogClose data-variant="solid">知道了，开始练习</DialogClose>
-            </DialogContent>
-          </Dialog>
+          <div className="practice-tools">
+            {session && (
+              <Button className="tool-trigger" aria-pressed={focusMode} onClick={toggleFocus}>
+                {focusMode ? "退出专注" : "专注模式"}
+              </Button>
+            )}
+            <Dialog open={soundOpen} onOpenChange={setSoundOpen}>
+              <DialogTrigger className="tool-trigger">
+                <Icon name="sound" />
+                击键声
+              </DialogTrigger>
+              <DialogBackdrop />
+              <DialogContent className="help-dialog">
+                <DialogTitle>击键声音</DialogTitle>
+                <DialogDescription>选中音色即可试听。输错时会响起低音。</DialogDescription>
+                <div className="sound-setting">
+                  <span>音色</span>
+                  <Choice
+                    label="击键音色"
+                    value={keySound.voice}
+                    options={[
+                      ["off", "静音"],
+                      ["wood", "木键"],
+                      ["switch", "机械键"],
+                    ]}
+                    onChange={(voice) => changeSound({ ...keySound, voice: voice as KeyVoice })}
+                  />
+                </div>
+                <div className="sound-setting">
+                  <span>音量</span>
+                  <Choice
+                    label="击键音量"
+                    value={String(keySound.volume)}
+                    options={[
+                      ["0.25", "轻"],
+                      ["0.5", "中"],
+                      ["0.85", "响"],
+                    ]}
+                    onChange={(volume) => changeSound({ ...keySound, volume: Number(volume) })}
+                  />
+                </div>
+                <DialogClose data-variant="solid">完成</DialogClose>
+              </DialogContent>
+            </Dialog>
+            <Dialog
+              open={helpOpen}
+              onOpenChange={(v) => {
+                setHelpOpen(v);
+                if (v) SpeechCoach.stop();
+              }}
+            >
+              <DialogTrigger className="help-trigger">
+                练习指南 <span aria-hidden="true">↗</span>
+              </DialogTrigger>
+              <DialogBackdrop />
+              <DialogContent className="help-dialog">
+                <DialogTitle>练习指南</DialogTitle>
+                <DialogDescription>先听音、拆拼音，再回想韵母所在的键。</DialogDescription>
+                <ol className="my-5 list-decimal space-y-3 pl-5 text-sm leading-7">
+                  <li>切换到英文输入法。每个汉字输入两位字母，答对自动进入下一题。</li>
+                  <li>按组熟悉韵母键，再试随机练习和文章。组内声母不限。</li>
+                  <li>听音模式隐藏题目；空格可以重听，查看提示后本轮不会点亮分组。</li>
+                  <li>错题连续独立答对三次自动移出。进度保存在当前浏览器，换设备不会自动同步。</li>
+                  <li>朗读使用设备的普通话语音；如果没有中文语音，仍可进行看字练习。</li>
+                </ol>
+                <DialogClose data-variant="solid">知道了，开始练习</DialogClose>
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
         <main className="main-content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">一点一点，练成习惯</p>
               <h1>{pages[page].title}</h1>
               <p className="mt-3 text-sm leading-7 text-stone-500">{pages[page].description}</p>
-            </div>
-            <div className="scheme-label">
-              <span>当前方案</span>
-              <strong>
-                小鹤双拼 <small>FLYPY</small>
-              </strong>
             </div>
           </div>
           {saveError && (
@@ -957,8 +1072,8 @@ export default function App() {
           )}
           {page === "shadow" && session?.mode === "shadow" && (
             <>
-              <div className="panel mb-5 p-4 sm:p-5">
-                <p className="mb-2 text-sm">
+              <div className="shadow-progress">
+                <p className="text-sm">
                   影子跟打进度{" "}
                   <strong>
                     已练习 {shadowCompleted.size} / {ARTICLES.length} 篇
@@ -1279,63 +1394,95 @@ export default function App() {
                 </p>
                 <Bar value={(articleCount / ARTICLES.length) * 100} label="文章练习完成度" />
               </div>
-              <Choice
-                label="文章分类"
-                value={articleCategory}
-                options={["全部", ...articleCategories].map((tag) => [tag, tag])}
-                onChange={setArticleCategory}
-              />
+              <div className="library-tools">
+                <Input
+                  type="search"
+                  aria-label="搜索文章"
+                  placeholder="搜索篇名、正文或练习音节"
+                  value={search}
+                  onValueChange={setSearch}
+                />
+                <Choice
+                  label="文章分类"
+                  value={articleCategory}
+                  options={["全部", ...articleCategories].map((tag) => [tag, tag])}
+                  onChange={setArticleCategory}
+                />
+                <span className="library-count" role="status">
+                  {foundArticles.length} 篇
+                </span>
+              </div>
+              {!foundArticles.length && (
+                <div className="library-empty">
+                  <p>没有找到匹配的文章</p>
+                  <Button
+                    onClick={() => {
+                      setSearch("");
+                      setArticleCategory("全部");
+                    }}
+                  >
+                    清除筛选
+                  </Button>
+                </div>
+              )}
               {articleCategories
-                .filter((tag) => articleCategory === "全部" || articleCategory === tag)
+                .filter((tag) => foundArticles.some((article) => article.tag === tag))
                 .map((tag) => (
                   <section key={tag}>
                     <h2 className="mb-3 text-lg font-semibold">{tag}</h2>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {ARTICLES.filter((article) => article.tag === tag).map((a) => (
-                        <article className="panel flex flex-col items-start p-5" key={a.id}>
-                          <div className="flex w-full items-baseline justify-between gap-3">
-                            <h3 className="text-base font-semibold">{a.title}</h3>
-                            <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-stone-600">
-                              <span>{a.syllables.split(" ").length} 字</span>
-                              {articleCompletion[a.id]?.articles || shadowCompleted.has(a.id) ? (
-                                <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-900">
-                                  已练习
-                                </span>
-                              ) : (
-                                <span>未练习</span>
-                              )}
+                      {foundArticles
+                        .filter((article) => article.tag === tag)
+                        .map((a) => (
+                          <article
+                            className="library-entry flex flex-col items-start p-5"
+                            key={a.id}
+                          >
+                            <div className="flex w-full items-baseline justify-between gap-3">
+                              <h3 className="text-base font-semibold">{a.title}</h3>
+                              <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-stone-600">
+                                <span>{a.syllables.split(" ").length} 字</span>
+                                {articleCompletion[a.id]?.articles || shadowCompleted.has(a.id) ? (
+                                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-900">
+                                    已练习
+                                  </span>
+                                ) : (
+                                  <span>未练习</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          {a.description && (
-                            <p className="mt-2 text-sm leading-6 text-stone-500">{a.description}</p>
-                          )}
-                          <blockquote className="my-4 line-clamp-3 text-sm leading-7 text-stone-600">
-                            {a.text}
-                          </blockquote>
-                          <div className="mt-auto flex flex-wrap gap-2">
-                            <Button
-                              data-variant="solid"
-                              onClick={() => start("articles", groupId, "syllable", a.id)}
-                            >
-                              练习《{a.title}》
-                            </Button>
-                            <Button
-                              data-variant="ghost"
-                              aria-label={`影子跟打《${a.title}》`}
-                              onClick={() => startShadow(a.id)}
-                            >
-                              影子跟打
-                            </Button>
-                          </div>
-                        </article>
-                      ))}
+                            {a.description && (
+                              <p className="mt-2 text-sm leading-6 text-stone-500">
+                                {a.description}
+                              </p>
+                            )}
+                            <blockquote className="my-4 line-clamp-3 text-sm leading-7 text-stone-600">
+                              {a.text}
+                            </blockquote>
+                            <div className="mt-auto flex flex-wrap gap-2">
+                              <Button
+                                data-variant="solid"
+                                onClick={() => start("articles", groupId, "syllable", a.id)}
+                              >
+                                练习《{a.title}》
+                              </Button>
+                              <Button
+                                data-variant="ghost"
+                                aria-label={`影子跟打《${a.title}》`}
+                                onClick={() => startShadow(a.id)}
+                              >
+                                影子跟打
+                              </Button>
+                            </div>
+                          </article>
+                        ))}
                     </div>
                   </section>
                 ))}
             </div>
           )}
           <footer className="page-footer">
-            <span>鹤习 · 把练习变成习惯</span>
+            <span>鹤习 · 小鹤双拼</span>
             <span>进度保存在当前浏览器</span>
           </footer>
         </main>

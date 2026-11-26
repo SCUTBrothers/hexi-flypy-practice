@@ -1,3 +1,4 @@
+import { contrastArticles } from "./contrast-articles";
 import { EXTRA_ARTICLES, EXTRA_EXAMPLES } from "./extra-practice-data";
 
 const INITIALS_REVERSE: Record<string, string> = { zh: "v", ch: "i", sh: "u" };
@@ -299,6 +300,7 @@ const ARTICLES = [
       "du zuo you huang li tan qin fu chang xiao shen lin ren bu zhi ming yue lai xiang zhao",
   },
   ...EXTRA_ARTICLES,
+  ...contrastArticles,
 ];
 function articleItems(article: (typeof ARTICLES)[number]) {
   const chars = article.text.split("").filter((c) => /[\u3400-\u9fff]/.test(c));

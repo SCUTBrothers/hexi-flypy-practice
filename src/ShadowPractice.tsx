@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@ui-sdk/react/button";
 import { Input } from "@ui-sdk/react/input";
 import { ARTICLES } from "./data";
 import type { Session } from "./practice";
 import type { RowCourse } from "./row-course";
+import { PassageCaret } from "./PassageCaret";
 import { ShadowResults } from "./ShadowResults";
 import {
   getResult,
@@ -49,28 +50,37 @@ export function ShadowPractice({
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const currentRef = useRef<HTMLSpanElement>(null);
   const passageRef = useRef<HTMLLabelElement>(null);
   const composing = useRef(false);
   const firstInput = useRef<number | null>(null);
   const signature = article.text + "\n" + article.syllables;
   const [previous] = useState(() => loadShadow(article.id, signature));
+  const [guide, setGuide] = useState(previous ? "last" : "off");
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [replayTime, setReplayTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
   const current = session.items[session.index];
-  const result = getResult(strokes);
+  const result = useMemo(() => getResult(strokes), [strokes]);
   const replay = session.done ? strokes : previous?.strokes;
   const replayDuration = replay?.at(-1)?.at ?? 0;
   const clockStart = replayTime ?? (session.done ? null : startTime);
   const clockLimit = replayTime === null ? Infinity : replayDuration;
   const isReplaying = replayTime !== null && elapsed < replayDuration;
-  const ghost = clockStart !== null && replay ? strokeAt(replay, elapsed) : undefined;
-  const showGhost = replayTime !== null || (!session.done && previous !== null);
-  const replayIndex = ghost?.index ?? 0;
+  const ghost =
+    clockStart !== null && replay && (replayTime !== null || guide === "last")
+      ? strokeAt(replay, elapsed)
+      : undefined;
+  const pace = replayTime === null && !session.done ? Number(guide) || 0 : 0;
+  const steps = Math.min(2 * session.items.length, Math.floor((elapsed * pace) / 30000));
+  const showGhost =
+    replayTime !== null || (!session.done && ((guide === "last" && !!previous) || pace > 0));
+  const replayIndex = pace ? Math.floor(steps / 2) : (ghost?.index ?? 0);
+  const ghostOffset = pace ? steps % 2 : (ghost?.offset ?? 0);
   const displayedIndex = replayTime !== null ? replayIndex : session.index;
+  const speed =
+    elapsed >= 1000 && session.index ? Math.round((session.index * 60000) / elapsed) : null;
   const next =
     session.done || course
       ? nextShadowArticle(article.id, completed, course?.sentences ?? articleOrder)
@@ -84,13 +94,16 @@ export function ShadowPractice({
 
   useEffect(() => {
     if (clockStart === null) return;
-    const timer = window.setInterval(() => {
-      const time = performance.now() - clockStart;
-      setElapsed(Math.min(time, clockLimit));
-      if (time >= clockLimit) window.clearInterval(timer);
-    }, 32);
+    const timer = window.setInterval(
+      () => {
+        const time = performance.now() - clockStart;
+        setElapsed(Math.min(time, clockLimit));
+        if (time >= clockLimit) window.clearInterval(timer);
+      },
+      showGhost ? 50 : 200,
+    );
     return () => window.clearInterval(timer);
-  }, [clockStart, clockLimit]);
+  }, [clockStart, clockLimit, showGhost]);
 
   useEffect(() => {
     if (!session.done) return;
@@ -98,14 +111,17 @@ export function ShadowPractice({
   }, [article.id, session.done, signature, strokes]);
 
   useEffect(() => {
-    if (session.index > 0 && !session.done) {
-      currentRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const passage = passageRef.current;
+    const glyph = passage?.querySelector<HTMLElement>(`[data-glyph="${displayedIndex}"]`);
+    if (!passage || !glyph) return;
+    const top = glyph.offsetTop;
+    if (
+      top < passage.scrollTop ||
+      top + glyph.offsetHeight > passage.scrollTop + passage.clientHeight
+    ) {
+      passage.scrollTop = Math.max(0, top - passage.clientHeight / 3);
     }
-  }, [session.index, session.done]);
-  useEffect(() => {
-    if (replayTime === null) return;
-    passageRef.current?.querySelector("[data-shadow-caret]")?.scrollIntoView({ block: "nearest" });
-  }, [replayIndex, replayTime]);
+  }, [displayedIndex]);
 
   function type(value: string) {
     if (!current || composing.current) return;
@@ -134,7 +150,47 @@ export function ShadowPractice({
     setElapsed(0);
   }
 
-  let index = 0;
+  const glyphs = useMemo(() => {
+    let index = 0;
+    return Array.from(article.text, (character, position) => {
+      if (!/[\u3400-\u9fff]/.test(character)) {
+        return (
+          <span key={position} data-state={index <= displayedIndex ? "done" : "waiting"}>
+            {character}
+          </span>
+        );
+      }
+      const i = index++;
+      const active = replayTime === null && i === session.index && !session.done;
+      const isError =
+        replayTime === null ? active && !!session.error : i === replayIndex && !!ghost?.errors;
+      const state = i < displayedIndex ? "done" : isError ? "error" : "waiting";
+      const caret = showGhost && replayIndex === i ? ghostOffset : undefined;
+      return (
+        <span
+          key={position}
+          data-glyph={i}
+          data-state={state}
+          data-active={active || undefined}
+          data-shadow-caret={caret}
+          aria-current={active ? "true" : undefined}
+        >
+          {character}
+        </span>
+      );
+    });
+  }, [
+    article.text,
+    displayedIndex,
+    replayTime,
+    session.index,
+    session.done,
+    session.error,
+    replayIndex,
+    ghost?.errors,
+    showGhost,
+    ghostOffset,
+  ]);
   return (
     <div className="flex flex-col gap-5">
       {session.done && (
@@ -155,7 +211,7 @@ export function ShadowPractice({
           onReplay={toggleReplay}
         />
       )}
-      <section className="panel p-5 [overflow-anchor:none] sm:p-8">
+      <section className="shadow-studio [overflow-anchor:none]">
         <div className="flex flex-wrap items-end justify-between gap-4">
           {course && sentence ? (
             <div>
@@ -185,7 +241,32 @@ export function ShadowPractice({
               </select>
             </label>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="shadow-actions">
+            {!session.done && !course && (
+              <label className="guide-label">
+                影子节奏
+                <select
+                  className="shadow-select"
+                  value={guide}
+                  onChange={(event) => {
+                    setGuide(event.target.value);
+                    if (replayTime !== null) {
+                      setReplayTime(null);
+                      setElapsed(0);
+                    }
+                    inputRef.current?.focus({ preventScroll: true });
+                  }}
+                >
+                  <option value="off">关闭</option>
+                  {previous && <option value="last">上次记录</option>}
+                  {[30, 60, 90].map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate} 字/分
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {course && next && !session.done && (
               <Button onClick={() => onArticle(next.id)}>换一句</Button>
             )}
@@ -199,12 +280,23 @@ export function ShadowPractice({
             )}
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-stone-600">
+        <div className="stroke-metrics">
           <span>
             {session.index} / {session.items.length} 字
           </span>
+          {replayTime === null && (
+            <>
+              <span>
+                <b>{session.done ? result.speed : (speed ?? "—")}</b> 字/分
+              </span>
+              <span>
+                击键准确率 <b>{result.keys ? Math.round(result.accuracy) + "%" : "—"}</b>
+              </span>
+            </>
+          )}
           <span>
-            用时 {duration(session.done ? result.elapsed : replayTime === null ? elapsed : 0)}
+            {replayTime !== null ? "回放" : "用时"}{" "}
+            {duration(replayTime !== null ? elapsed : session.done ? result.elapsed : elapsed)}
           </span>
         </div>
         <div className="relative mt-4">
@@ -241,39 +333,19 @@ export function ShadowPractice({
             disabled={session.done}
           />
           <label ref={passageRef} htmlFor={inputId} className="shadow-passage">
-            {Array.from(article.text, (character, position) => {
-              if (!/[\u3400-\u9fff]/.test(character)) {
-                return (
-                  <span key={position} data-state={index <= displayedIndex ? "done" : "waiting"}>
-                    {character}
-                  </span>
-                );
-              }
-              const i = index++;
-              const active = replayTime === null && i === session.index && !session.done;
-              const isError =
-                replayTime === null
-                  ? active && session.failed
-                  : i === replayIndex && !!ghost?.errors;
-              const state = i < displayedIndex ? "done" : isError ? "error" : "waiting";
-              const caret =
-                showGhost && (ghost?.index ?? 0) === i ? (ghost?.offset ?? 0) : undefined;
-              return (
-                <span
-                  key={position}
-                  ref={active ? currentRef : undefined}
-                  data-state={state}
-                  data-active={active || undefined}
-                  data-shadow-caret={caret}
-                  aria-current={active ? "true" : undefined}
-                >
-                  {character}
-                </span>
-              );
-            })}
-            {showGhost && ghost?.index === session.items.length && (
-              <span aria-hidden="true" className="shadow-end" data-shadow-caret="0" />
+            {glyphs}
+            {showGhost && replayIndex === session.items.length && (
+              <span
+                aria-hidden="true"
+                className="shadow-end"
+                data-glyph={session.items.length}
+                data-shadow-caret="0"
+              />
             )}
+            {!session.done && replayTime === null && (
+              <PassageCaret index={session.index} offset={session.input.length} />
+            )}
+            {showGhost && <PassageCaret index={replayIndex} offset={ghostOffset} ghost />}
           </label>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-stone-600">
@@ -287,11 +359,17 @@ export function ShadowPractice({
           {showGhost && (
             <span className="flex items-center gap-2">
               <span aria-hidden="true" className="h-4 w-0.5 rounded bg-rose-600" />
-              {replayTime === null ? "上次的影子" : "回放 " + duration(elapsed)}
+              {pace
+                ? `配速 ${pace} 字/分`
+                : replayTime === null
+                  ? "上次的影子"
+                  : "回放 " + duration(elapsed)}
               {ghost && <kbd className={ghost.errors ? "text-rose-700" : ""}>{ghost.key}</kbd>}
             </span>
           )}
-          {!course && !previous && !session.done && <span>完成首轮后，这篇文章就会有影子。</span>}
+          {!course && !previous && !session.done && !pace && (
+            <span>完成本篇即可与自己的记录跟打。</span>
+          )}
         </div>
         <p className="mt-3 min-h-5 text-sm text-stone-600" role="status">
           {session.error || (!session.done && "用英文键盘输入双拼，标点自动跳过。")}

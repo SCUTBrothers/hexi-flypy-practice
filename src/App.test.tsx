@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { createAgent } from "@ui-sdk/react/agent";
 import { expect, test } from "vite-plus/test";
 import App from "./App";
-import { encode } from "./data";
+import { ARTICLES, encode } from "./data";
 import { createSession, freshProgress, STORAGE } from "./practice";
 import { engine, utterances, voices } from "./test/setup";
 import { SpeechCoach } from "./speech";
@@ -17,7 +17,7 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   const field = screen.getByRole("textbox", { name: "影子跟打输入" });
   const active = () => view.container.querySelector(".shadow-passage [aria-current]");
   expect(field).toBe(document.activeElement);
-  expect(screen.getByText("已练习 0 / 60 篇")).toBeTruthy();
+  expect(screen.getByText(`已练习 0 / ${ARTICLES.length} 篇`)).toBeTruthy();
   expect(screen.getByRole("option", { name: "慢慢来，也很好 · 未练习" })).toBeTruthy();
   expect(active()).toHaveProperty("textContent", "每");
   expect(active()?.getAttribute("data-state")).toBe("waiting");
@@ -42,7 +42,7 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   await user.click(screen.getByText("展开成绩明细"));
   expect(screen.getByRole("row", { name: /按错次数 1/ })).toBeTruthy();
   expect(screen.getByRole("row", { name: /完成汉字 13/ })).toBeTruthy();
-  expect(screen.getByText("已练习 1 / 60 篇")).toBeTruthy();
+  expect(screen.getByText(`已练习 1 / ${ARTICLES.length} 篇`)).toBeTruthy();
   expect(screen.getByRole("option", { name: "慢慢来，也很好 · 已练习" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "再跟打一轮" }));
   expect(screen.getByRole("button", { name: "回放上次" })).toBeTruthy();
@@ -55,7 +55,7 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   expect(screen.getByRole("row", { name: "按错次数 0 1" })).toBeTruthy();
   expect(screen.getByRole("list", { name: "图例" }).textContent).toContain("上次");
   expect(screen.getByRole("button", { name: "回放本轮" })).toBeTruthy();
-  expect(screen.getByText("已练习 1 / 60 篇")).toBeTruthy();
+  expect(screen.getByText(`已练习 1 / ${ARTICLES.length} 篇`)).toBeTruthy();
   expect(screen.getByText("接下来练《早餐时间》")).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "下一篇" }));
   expect(screen.queryByRole("heading", { name: "跟打统计" })).toBeNull();
@@ -64,7 +64,7 @@ test("shadow typing marks the sentence in place, saves the run and compares resu
   view.unmount();
   render(<App />);
   await user.click(screen.getByRole("button", { name: "文章练习" }));
-  expect(screen.getByText("已练习 1 / 60 篇")).toBeTruthy();
+  expect(screen.getByText(`已练习 1 / ${ARTICLES.length} 篇`)).toBeTruthy();
   expect(
     screen.getByRole("heading", { name: "慢慢来，也很好" }).closest("article")?.textContent,
   ).toContain("已练习");
@@ -88,7 +88,7 @@ test("continuing a shadow round by keyboard skips articles already practised", a
   await user.keyboard("{Enter}wo");
   expect(screen.getByRole("textbox", { name: "影子跟打输入" })).toBe(document.activeElement);
   expect(view.container.querySelector(".shadow-passage [aria-current]")?.textContent).toBe("在");
-  expect(screen.getByText("已练习 2 / 60 篇")).toBeTruthy();
+  expect(screen.getByText(`已练习 2 / ${ARTICLES.length} 篇`)).toBeTruthy();
 });
 test("a device without Mandarin keeps visual practice usable and disables listening", async () => {
   const saved = voices.splice(0);
@@ -337,4 +337,49 @@ test("the notebook reports a wrong expected key and links to personalized random
   ).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "去随机拼字" }));
   expect(screen.getByText("1 / 30")).toBeTruthy();
+});
+
+test("find a contrast passage and start a paced run with two key positions", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<App />);
+  await user.click(screen.getByRole("button", { name: "文章练习" }));
+  const search = screen.getByRole("searchbox", { name: "搜索文章" });
+  await user.type(search, "zzzz");
+  await user.click(screen.getByRole("button", { name: "清除筛选" }));
+  await user.type(search, "林间很静");
+  await user.click(screen.getByRole("button", { name: "影子跟打《听见风铃》" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "影子节奏" }), "60");
+  const caret = () => container.querySelector<HTMLElement>(".passage-caret:not(.ghost-caret)")!;
+  expect(container.querySelector(".ghost-caret")).toBeTruthy();
+  expect(caret().dataset.index).toBe("0");
+  await user.keyboard("l");
+  expect(caret().dataset.offset).toBe("1");
+  await user.keyboard("{Backspace}");
+  expect(caret().dataset.offset).toBe("0");
+  await user.keyboard(encode("lin"));
+  expect(caret().dataset.index).toBe("1");
+  expect(caret().dataset.offset).toBe("0");
+  expect(localStorage.getItem("hexi-shadow-v1:contrast-in-ing")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "专注模式" }));
+  expect(screen.getByRole("textbox", { name: "影子跟打输入" })).toBe(document.activeElement);
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: "专注模式" }).getAttribute("aria-pressed")).toBe(
+    "false",
+  );
+});
+
+test("keystroke sound preferences survive remount independently of spoken hints", async () => {
+  const user = userEvent.setup();
+  const view = render(<App />);
+  await user.click(screen.getByRole("button", { name: "击键声" }));
+  expect(screen.getByRole("radio", { name: "静音" }).getAttribute("aria-checked")).toBe("true");
+  await user.click(screen.getByRole("radio", { name: "机械键" }));
+  await user.click(screen.getByRole("radio", { name: "轻" }));
+  await user.click(screen.getByRole("button", { name: "完成" }));
+  expect(JSON.parse(localStorage.getItem("hexi-audio-v1")!).autoRead).toBe(false);
+  view.unmount();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "击键声" }));
+  expect(screen.getByRole("radio", { name: "机械键" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.getByRole("radio", { name: "轻" }).getAttribute("aria-checked")).toBe("true");
 });
