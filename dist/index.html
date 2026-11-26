@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#197b62">
+  <meta name="description" content="从一个键开始，循序渐进练习小鹤双拼。键位速查、专项练习、随机挑战、错题复习与文章练习。">
+  <title>鹤习 · 小鹤双拼练习</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23197b62'/%3E%3Ctext x='8' y='29' fill='white' font-size='27'%3E鹤%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#practice" aria-label="鹤习首页"><span class="brand-mark">鹤</span><span>鹤习<small>让双拼成为习惯</small></span></a>
+    <div class="nav-label">学习空间</div>
+    <nav id="navigation" aria-label="主导航"></nav>
+    <div class="side-note"><span class="note-spark">✧</span><strong>从一个键开始</strong><p>不必急着变快，<br>先让每个键变得熟悉。</p><div class="tiny-keys"><kbd>q</kbd><kbd>w</kbd><kbd>e</kbd><span>…</span></div></div>
+    <div class="side-bottom"><span class="local-dot"></span>进度自动保存在本机<button id="help-button" title="使用帮助" aria-label="使用帮助">?</button></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div class="breadcrumb">学习空间 <span>/</span> <strong id="breadcrumb-current">进阶练习</strong></div><div class="top-actions"><span class="scheme"><span class="small-logo">鹤</span>小鹤双拼</span><button class="icon-button" id="help-top" aria-label="打开使用帮助">?</button></div></header>
+    <main id="main"></main>
+    <footer>慢慢来，每一次练习都算数。<span>HEXI · PRACTICE MAKES FAMILIAR</span></footer>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="help-dialog"><button class="dialog-close icon-button" aria-label="关闭帮助">×</button><span class="eyebrow">开始之前</span><h2>两次敲击，一个音节。</h2><p>请先把系统输入法切换到<strong>英文模式</strong>，再直接输入字母。手机也可以点击输入框使用英文键盘。</p><div class="help-example"><span>双 <small>shuang</small></span><kbd>u</kbd><span>+</span><kbd>l</kbd></div><p>每排拆成小组，例如上排分为 QWERT 和 YUIOP。默认随机显示组内韵母对应的汉字和拼音，输入两位编码；每轮混合覆盖组内各键。需要时可以打开答案提示，或切换「韵母热身」。</p><p>可以开启「自动朗读」边听边打，或切换「听音拼写」隐藏汉字与拼音。听音时先点击重听，输入两位双拼；答对后揭晓。按空格可重听，点击「看一下汉字和拼音」可查看本题。多音字会用词语和字序指定目标字。<br><br>每组汉字拼写完成后，不查看题目提示且正确率达到 90% 即点亮本组进度。错过的题目会进入错题本，连续答对 3 次后自动移出。</p><p class="muted">练习记录仅保存在当前浏览器；清除浏览器数据会删除进度。键位与零声母规则依据<a href="https://flypy.cc/" target="_blank" rel="noopener">小鹤官方网站</a>。</p><button class="primary full" id="help-dismiss">开始熟悉小鹤</button></dialog>
+  <script src="data.js?v=3"></script>
+  <script src="speech.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+</body>
+</html>

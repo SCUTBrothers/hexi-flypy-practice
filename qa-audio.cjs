@@ -1,0 +1,30 @@
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+let voices=[{name:'English',lang:'en-US'},{name:'Cantonese',lang:'zh-HK'},{name:'Mandarin',lang:'zh-CN'}];
+const spoken=[],stored=new Map(),nodes=new Map();let cancelCount=0;
+const engine={getVoices:()=>voices,cancel(){cancelCount++},speak(u){spoken.push(u);u.onstart();},addEventListener(){}};
+function node(){return {innerHTML:'',textContent:'',classList:{add(){},remove(){}},style:{setProperty(){}},addEventListener(){},insertAdjacentHTML(){},focus(){},setAttribute(){},showModal(){},close(){}};}
+const context=vm.createContext({assert,console,Date,Math,JSON,setTimeout:()=>0,clearTimeout(){},setInterval(){},location:{hash:''},window:{speechSynthesis:engine,SpeechSynthesisUtterance:class {constructor(text){this.text=text;}},addEventListener(){}},localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},document:{querySelector:s=>{if(!nodes.has(s))nodes.set(s,node());return nodes.get(s);},querySelectorAll:()=>[],addEventListener(){}}});
+for(const file of ['data.js','speech.js','app.js'])vm.runInContext(fs.readFileSync('dist/'+file,'utf8'),context);
+context.spoken=spoken;context.replaceVoices=v=>voices=v;
+vm.runInContext(`
+assert.ok(SpeechCoach.snapshot().available);assert.equal(SpeechCoach.snapshot().voiceName,'Mandarin');
+assert.equal(SpeechCoach.textFor({han:'长',py:'chang'}),'长短，第一个字。');assert.equal(SpeechCoach.textFor({han:'行',py:'hang'}),'银行，第二个字。');
+assert.equal(SpeechCoach.speak({han:'秋',py:'qiu'},0.65),true);assert.equal(spoken.at(-1).text,'秋');assert.equal(spoken.at(-1).rate,0.65);assert.equal(spoken.at(-1).lang,'zh-CN');assert.equal(SpeechCoach.snapshot().status,'speaking');
+const cancelled=spoken.at(-1);SpeechCoach.stop();cancelled.onend();assert.equal(SpeechCoach.snapshot().status,'idle');
+SpeechCoach.speak({han:'秋',py:'qiu'});spoken.at(-1).onerror({error:'not-allowed'});assert.equal(SpeechCoach.snapshot().status,'error');assert.ok(SpeechCoach.snapshot().message.includes('拦截'));
+listenOnly=true;autoRead=true;audioUnlocked=true;resetPractice();renderSession();assert.ok(hideQuestion());
+const promptHTML=$('#session-area').innerHTML.split('<div class="question-zone')[1];assert.ok(!promptHTML.includes('汉字 · '+current().py));assert.ok(promptHTML.includes('题目已隐藏'));
+const count=spoken.length;renderSession();assert.equal(spoken.length,count,'Rerender must not replay the same question');
+const previous=current();for(const ch of previous.answer)accept(ch);assert.equal(session.lastAnswer.han,previous.han);assert.ok(hideQuestion());assert.equal(spoken.length,count+1,'Next question plays once');
+assert.ok($('#session-area').innerHTML.includes(answerReview(previous)));
+action('pause');assert.equal(SpeechCoach.snapshot().status,'idle');const pausedCount=spoken.length;playCurrent();assert.equal(spoken.length,pausedCount);action('pause');assert.equal(spoken.length,pausedCount+1);
+session.revealed=true;assert.equal(hideQuestion(),false);session.revealed=false;assert.equal(hideQuestion(),true);
+groupId='top-qwert';practiceType='mapping';resetPractice();const sample=audioItem();assert.equal(soundParts(sample).final,current().prompt);assert.equal(hideQuestion(),false);
+practiceType='syllable';resetPractice();session.assisted=1;for(let i=0;i<20;i++){for(const ch of current().answer)accept(ch);}assert.ok(session.done);assert.ok(!isGroupDone(GROUPS[0]));assert.ok($('#session-area').innerHTML.includes('查看了 1 次'));
+speechRate=0.65;autoRead=true;saveAudioSettings();assert.equal(JSON.parse(localStorage.getItem('hexi-audio-v1')).rate,0.65);
+replaceVoices([{name:'Cantonese',lang:'zh-HK'},{name:'English',lang:'en-US'}]);SpeechCoach.refresh();assert.equal(SpeechCoach.snapshot().available,false);assert.equal(SpeechCoach.speak({han:'秋',py:'qiu'}),false);
+replaceVoices([{name:'Taiwan Mandarin',lang:'zh-TW'}]);SpeechCoach.refresh();assert.ok(SpeechCoach.snapshot().available);
+`,context);
+console.log('PASS: Mandarin voice selection; contextual polyphones; rate and language; lifecycle errors and cancel; hidden listening prompts; single autoplay per question; reveal after correct; pause/resume; final exemplar audio; no mastery with revealed hints; settings persistence; missing-voice fallback.');
