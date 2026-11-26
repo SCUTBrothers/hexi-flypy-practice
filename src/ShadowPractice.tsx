@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -16,6 +18,15 @@ import type { RowCourse } from "./row-course";
 import { PassageCaret } from "./PassageCaret";
 import { ShadowResults } from "./ShadowResults";
 import {
+  applyCaretTransform,
+  caretPointForPosition,
+  interpolatePacePoint,
+  measurePassageLayout,
+  rowShiftForGlyph,
+  viewportHeightForRows,
+  type PassageLayout,
+} from "./shadow-motion";
+import {
   getResult,
   loadShadow,
   recordStroke,
@@ -25,6 +36,13 @@ import {
 } from "./shadow-record";
 
 type Article = (typeof ARTICLES)[number];
+
+type GhostMark = {
+  readonly index: number;
+  readonly offset: number;
+  readonly key?: string;
+  readonly errors?: number;
+};
 
 const duration = (ms: number) => (ms / 1000).toFixed(1) + " 秒";
 const articleGroups = [...new Set(ARTICLES.map((article) => article.tag))].map((tag) => ({
@@ -49,6 +67,175 @@ function nextShadowArticle(id: string, completed: ReadonlySet<string>, order: Ar
   const following = [...order.slice(index + 1), ...order.slice(0, index)];
   return following.find((article) => !completed.has(article.id)) ?? following[0];
 }
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+const ShadowLiveMetrics = memo(function ShadowLiveMetrics({
+  index,
+  total,
+  done,
+  result,
+  clockStart,
+  clockLimit,
+  isReplay,
+}: {
+  index: number;
+  total: number;
+  done: boolean;
+  result: ReturnType<typeof getResult>;
+  clockStart: number | null;
+  clockLimit: number;
+  isReplay: boolean;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (clockStart === null) {
+      setElapsed(0);
+      return;
+    }
+    const tick = () => {
+      if (document.hidden) return;
+      const next = Math.min(performance.now() - clockStart, clockLimit);
+      setElapsed(next);
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [clockStart, clockLimit]);
+
+  const displayedElapsed = isReplay ? elapsed : done ? result.elapsed : elapsed;
+  const liveSpeed =
+    !done && elapsed >= 1000 && index ? Math.round((index * 60000) / elapsed) : null;
+
+  return (
+    <div className="stroke-metrics">
+      <span className="mt-metric-progress">
+        {index} / {total} 字
+      </span>
+      {!isReplay && (
+        <>
+          <span className="mt-metric-speed">
+            <b>{done ? result.speed : (liveSpeed ?? "—")}</b> 字/分
+          </span>
+          <span>
+            击键准确率 <b>{result.keys ? Math.round(result.accuracy) + "%" : "—"}</b>
+          </span>
+        </>
+      )}
+      <span>
+        {isReplay ? "回放" : "用时"} <b>{duration(displayedElapsed)}</b>
+      </span>
+    </div>
+  );
+});
+
+const ShadowPassageGlyphs = memo(function ShadowPassageGlyphs({
+  text,
+  displayedIndex,
+  sessionIndex,
+  sessionDone,
+  hasError,
+  inputLength,
+  wrongSeq,
+  replayActive,
+  ghostIndex,
+  ghostOffset,
+  ghostErrors,
+  showGhost,
+}: {
+  text: string;
+  displayedIndex: number;
+  sessionIndex: number;
+  sessionDone: boolean;
+  hasError: boolean;
+  inputLength: number;
+  wrongSeq: number;
+  replayActive: boolean;
+  ghostIndex: number;
+  ghostOffset: number;
+  ghostErrors: boolean;
+  showGhost: boolean;
+}) {
+  const chars = Array.from(text);
+  const isHan = (ch: string) => /[\u3400-\u9fff]/.test(ch);
+  const isOpeningPunct = (ch: string) => /^[“‘（《【「『(]$/.test(ch);
+  const isClosingPunct = (ch: string) => /^[，。、！？；：,.!?;:”’）》】」』)—…·]$/.test(ch);
+  let hanIndex = 0;
+  const units: ReactNode[] = [];
+  let pos = 0;
+
+  while (pos < chars.length) {
+    const group: ReactNode[] = [];
+    const unitStart = pos;
+
+    while (pos < chars.length && isOpeningPunct(chars[pos])) {
+      const ch = chars[pos];
+      group.push(
+        <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
+          {ch}
+        </span>,
+      );
+      pos++;
+    }
+
+    if (pos < chars.length && isHan(chars[pos])) {
+      const ch = chars[pos];
+      const i = hanIndex++;
+      const active = !replayActive && i === sessionIndex && !sessionDone;
+      const isError = !replayActive ? active && hasError : i === ghostIndex && ghostErrors;
+      const state = i < displayedIndex ? "done" : isError ? "error" : "waiting";
+      const caret = showGhost && ghostIndex === i ? ghostOffset : undefined;
+      group.push(
+        <span
+          key={pos}
+          data-glyph={i}
+          data-state={state}
+          data-active={active || undefined}
+          data-half={active && inputLength > 0 ? "true" : undefined}
+          data-shake={active && isError && wrongSeq ? (wrongSeq % 2 === 0 ? "a" : "b") : undefined}
+          data-shadow-caret={caret}
+          aria-current={active ? "true" : undefined}
+        >
+          {ch}
+        </span>,
+      );
+      pos++;
+    } else if (pos < chars.length && group.length === 0) {
+      const ch = chars[pos];
+      group.push(
+        <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
+          {ch}
+        </span>,
+      );
+      pos++;
+    }
+
+    while (pos < chars.length && isClosingPunct(chars[pos])) {
+      const ch = chars[pos];
+      group.push(
+        <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
+          {ch}
+        </span>,
+      );
+      pos++;
+    }
+
+    units.push(
+      <span key={unitStart} className="mt-word-unit">
+        {group}
+      </span>,
+    );
+  }
+
+  return <>{units}</>;
+});
 
 export function ShadowPractice({
   article,
@@ -76,6 +263,8 @@ export function ShadowPractice({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const passageRef = useRef<HTMLLabelElement>(null);
+  const ghostCaretRef = useRef<HTMLElement>(null);
+  const layoutRef = useRef<PassageLayout | null>(null);
   const composing = useRef(false);
   const firstInput = useRef<number | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -86,37 +275,58 @@ export function ShadowPractice({
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [replayTime, setReplayTime] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [replayFinished, setReplayFinished] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [focused, setFocused] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [wrongFlash, setWrongFlash] = useState<{ key: string; seq: number } | null>(null);
+  const [layout, setLayout] = useState<PassageLayout | null>(null);
+  const [ghostMark, setGhostMark] = useState<GhostMark>({ index: 0, offset: 0 });
 
   const current = session.items[session.index];
   const result = useMemo(() => getResult(strokes), [strokes]);
   const replay = session.done ? strokes : previous?.strokes;
   const replayDuration = replay?.at(-1)?.at ?? 0;
-  const clockStart = replayTime ?? (session.done ? null : startTime);
-  const clockLimit = replayTime === null ? Infinity : replayDuration;
-  const isReplaying = replayTime !== null && elapsed < replayDuration;
-  const ghost =
-    clockStart !== null && replay && (replayTime !== null || guide === "last")
-      ? strokeAt(replay, elapsed)
-      : undefined;
-  const pace = replayTime === null && !session.done ? Number(guide) || 0 : 0;
-  const steps = Math.min(2 * session.items.length, Math.floor((elapsed * pace) / 30000));
+  const isReplaying = replayTime !== null && !replayFinished;
+  const clockStart = isReplaying ? replayTime : session.done ? null : startTime;
+  const clockLimit = isReplaying ? replayDuration : Infinity;
+  const pace = !isReplaying && !session.done ? Number(guide) || 0 : 0;
   const showGhost =
-    replayTime !== null || (!session.done && ((guide === "last" && !!previous) || pace > 0));
-  const replayIndex = pace ? Math.floor(steps / 2) : (ghost?.index ?? 0);
-  const ghostOffset = pace ? steps % 2 : (ghost?.offset ?? 0);
-  const displayedIndex = replayTime !== null ? replayIndex : session.index;
-  const speed =
-    elapsed >= 1000 && session.index ? Math.round((session.index * 60000) / elapsed) : null;
+    isReplaying || (!session.done && ((guide === "last" && !!previous) || pace > 0));
+  const displayedIndex = isReplaying ? ghostMark.index : session.index;
   const next =
     session.done || course
       ? nextShadowArticle(article.id, completed, course?.sentences ?? articleOrder)
       : undefined;
   const sentence = course?.sentences.find((item) => item.id === article.id);
+
+  const remeasure = useCallback(() => {
+    const passage = passageRef.current;
+    if (!passage) return;
+    const measured = measurePassageLayout(passage);
+    layoutRef.current = measured;
+    setLayout(measured);
+  }, []);
+
+  useLayoutEffect(() => {
+    remeasure();
+    const passage = passageRef.current;
+    if (!passage) return;
+    const observer = new ResizeObserver(() => remeasure());
+    observer.observe(passage);
+    return () => observer.disconnect();
+  }, [article.id, remeasure]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !("fonts" in document)) return;
+    let active = true;
+    void document.fonts.ready.then(() => {
+      if (active) remeasure();
+    });
+    return () => {
+      active = false;
+    };
+  }, [article.id, remeasure]);
 
   useEffect(() => {
     inputRef.current?.focus({ preventScroll: true });
@@ -136,20 +346,6 @@ export function ShadowPractice({
   }, [session.done, onTypingActivity]);
 
   useEffect(() => {
-    if (clockStart === null) return;
-    const timer = window.setInterval(
-      () => {
-        if (document.hidden) return;
-        const time = performance.now() - clockStart;
-        setElapsed(Math.min(time, clockLimit));
-        if (time >= clockLimit) window.clearInterval(timer);
-      },
-      showGhost ? 50 : 200,
-    );
-    return () => window.clearInterval(timer);
-  }, [clockStart, clockLimit, showGhost]);
-
-  useEffect(() => {
     if (!session.done) return;
     setSaveFailed(!saveShadow(article.id, { signature, strokes }));
   }, [article.id, session.done, signature, strokes]);
@@ -166,16 +362,145 @@ export function ShadowPractice({
     }
   }, [session.input, session.index]);
 
+  // Position ghost caret smoothly via rAF with zero per-frame React re-renders.
   useEffect(() => {
-    const passage = passageRef.current;
-    const glyph = passage?.querySelector<HTMLElement>(`[data-glyph="${displayedIndex}"]`);
-    if (!passage || !glyph) return;
-    const lineHeight = glyph.offsetHeight || 52;
-    const target = Math.max(0, glyph.offsetTop - lineHeight * 1.15);
-    if (Math.abs(passage.scrollTop - target) > 4) {
-      passage.scrollTop = target;
+    if (!showGhost) return;
+
+    const placeRestingGhost = () => {
+      const mark = ghostCaretRef.current;
+      const measured = layoutRef.current;
+      if (!mark || !measured?.boxes.length) return;
+      const point = caretPointForPosition(measured, 0, 0);
+      if (point) applyCaretTransform(mark, point, true);
+    };
+
+    if (clockStart === null) {
+      setGhostMark({ index: 0, offset: 0 });
+      placeRestingGhost();
+      return;
     }
-  }, [displayedIndex]);
+
+    const totalItems = session.items.length;
+    let lastIdx = -1;
+    let lastOffset = -1;
+    let lastKey: string | undefined;
+    let lastErr = -1;
+    let rafId = 0;
+    let intervalId = 0;
+
+    const stepFrame = () => {
+      if (document.hidden) return false;
+      const elapsedMs = Math.min(performance.now() - clockStart, clockLimit);
+      const measured = layoutRef.current;
+      const mark = ghostCaretRef.current;
+
+      if (pace > 0) {
+        const progress = Math.min(totalItems, (elapsedMs * pace) / 60000);
+        const point = measured ? interpolatePacePoint(measured, progress) : null;
+        if (mark && point) {
+          // Pace mode glides frame-by-frame via rAF so CSS transform transition stays off.
+          applyCaretTransform(mark, point, true);
+        }
+        const discreteSteps = Math.min(2 * totalItems, Math.floor((elapsedMs * pace) / 30000));
+        const nextIdx = Math.floor(discreteSteps / 2);
+        const nextOffset = discreteSteps % 2;
+        if (nextIdx !== lastIdx || nextOffset !== lastOffset) {
+          lastIdx = nextIdx;
+          lastOffset = nextOffset;
+          setGhostMark({ index: nextIdx, offset: nextOffset });
+        }
+        return elapsedMs >= (totalItems * 60000) / pace;
+      }
+
+      if (replay) {
+        const currentStroke = strokeAt(replay, elapsedMs);
+        const nextIdx = currentStroke?.index ?? 0;
+        const nextOffset = currentStroke?.offset ?? 0;
+        if (mark && measured?.boxes.length) {
+          const point = caretPointForPosition(measured, nextIdx, nextOffset);
+          if (point) applyCaretTransform(mark, point, false);
+        }
+        const nextErr = currentStroke?.errors ?? 0;
+        if (
+          nextIdx !== lastIdx ||
+          nextOffset !== lastOffset ||
+          currentStroke?.key !== lastKey ||
+          nextErr !== lastErr
+        ) {
+          lastIdx = nextIdx;
+          lastOffset = nextOffset;
+          lastKey = currentStroke?.key;
+          lastErr = nextErr;
+          setGhostMark({
+            index: nextIdx,
+            offset: nextOffset,
+            key: currentStroke?.key,
+            errors: nextErr,
+          });
+        }
+      }
+
+      if (isReplaying && elapsedMs >= clockLimit) {
+        setReplayFinished(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (prefersReducedMotion()) {
+      stepFrame();
+      intervalId = window.setInterval(() => {
+        if (stepFrame()) window.clearInterval(intervalId);
+      }, 250);
+      return () => window.clearInterval(intervalId);
+    }
+
+    const loop = () => {
+      if (!stepFrame()) {
+        rafId = window.requestAnimationFrame(loop);
+      }
+    };
+    rafId = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [showGhost, clockStart, clockLimit, pace, replay, session.items.length, isReplaying, layout]);
+
+  const type = useCallback(
+    (value: string) => {
+      if (!current || composing.current) return;
+      const now = performance.now();
+      const started = firstInput.current ?? now;
+      const stroke = recordStroke(
+        Math.round(now - started),
+        session.index,
+        current.answer,
+        session.input,
+        value.toLowerCase(),
+      );
+      if (stroke) {
+        if (firstInput.current === null) {
+          firstInput.current = started;
+          setStartTime(started);
+          setReplayTime(null);
+          setReplayFinished(false);
+        }
+        setStrokes((previousStrokes) => [...previousStrokes, stroke]);
+        setIsTyping(true);
+        onTypingActivity?.(true);
+        clearTimeout(idleTimer.current);
+        idleTimer.current = setTimeout(() => setIsTyping(false), 650);
+
+        if (stroke.errors > 0) {
+          setWrongFlash((prev) => ({ key: stroke.key, seq: (prev?.seq ?? 0) + 1 }));
+          clearTimeout(wrongTimer.current);
+          wrongTimer.current = setTimeout(() => setWrongFlash(null), 600);
+        } else {
+          setWrongFlash(null);
+        }
+      }
+      onInput(value);
+    },
+    [current, session.index, session.input, onInput, onTypingActivity],
+  );
 
   const typeRef = useRef(type);
   typeRef.current = type;
@@ -208,138 +533,20 @@ export function ShadowPractice({
     return () => window.removeEventListener("keydown", handleKey);
   }, [session.done, isReplaying]);
 
-  function type(value: string) {
-    if (!current || composing.current) return;
-    const now = performance.now();
-    const started = firstInput.current ?? now;
-    const stroke = recordStroke(
-      Math.round(now - started),
-      session.index,
-      current.answer,
-      session.input,
-      value.toLowerCase(),
-    );
-    if (stroke) {
-      if (firstInput.current === null) {
-        firstInput.current = started;
-        setStartTime(started);
-        setElapsed(0);
-        setReplayTime(null);
-      }
-      setStrokes((previousStrokes) => [...previousStrokes, stroke]);
-      setIsTyping(true);
-      onTypingActivity?.(true);
-      clearTimeout(idleTimer.current);
-      idleTimer.current = setTimeout(() => setIsTyping(false), 650);
-
-      if (stroke.errors > 0) {
-        setWrongFlash((prev) => ({ key: stroke.key, seq: (prev?.seq ?? 0) + 1 }));
-        clearTimeout(wrongTimer.current);
-        wrongTimer.current = setTimeout(() => setWrongFlash(null), 700);
-      } else {
-        setWrongFlash(null);
-      }
-    }
-    onInput(value);
-  }
-
   function toggleReplay() {
-    setReplayTime(isReplaying ? null : performance.now());
-    setElapsed(0);
-  }
-
-  const glyphs = useMemo(() => {
-    const chars = Array.from(article.text);
-    const isHan = (ch: string) => /[\u3400-\u9fff]/.test(ch);
-    const isOpeningPunct = (ch: string) => /^[“‘（《【「『(]$/.test(ch);
-    const isClosingPunct = (ch: string) => /^[，。、！？；：,.!?;:”’）》】」』)—…·]$/.test(ch);
-    let hanIndex = 0;
-    const units: ReactNode[] = [];
-    let pos = 0;
-
-    while (pos < chars.length) {
-      const group: ReactNode[] = [];
-      const unitStart = pos;
-
-      while (pos < chars.length && isOpeningPunct(chars[pos])) {
-        const ch = chars[pos];
-        group.push(
-          <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
-            {ch}
-          </span>,
-        );
-        pos++;
-      }
-
-      if (pos < chars.length && isHan(chars[pos])) {
-        const ch = chars[pos];
-        const i = hanIndex++;
-        const active = replayTime === null && i === session.index && !session.done;
-        const isError =
-          replayTime === null ? active && !!session.error : i === replayIndex && !!ghost?.errors;
-        const state = i < displayedIndex ? "done" : isError ? "error" : "waiting";
-        const caret = showGhost && replayIndex === i ? ghostOffset : undefined;
-        group.push(
-          <span
-            key={pos}
-            data-glyph={i}
-            data-state={state}
-            data-active={active || undefined}
-            data-half={active && session.input.length > 0 ? "true" : undefined}
-            data-shake={
-              active && isError && wrongFlash ? (wrongFlash.seq % 2 === 0 ? "a" : "b") : undefined
-            }
-            data-shadow-caret={caret}
-            aria-current={active ? "true" : undefined}
-          >
-            {ch}
-          </span>,
-        );
-        pos++;
-      } else if (pos < chars.length && group.length === 0) {
-        const ch = chars[pos];
-        group.push(
-          <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
-            {ch}
-          </span>,
-        );
-        pos++;
-      }
-
-      while (pos < chars.length && isClosingPunct(chars[pos])) {
-        const ch = chars[pos];
-        group.push(
-          <span key={pos} data-state={hanIndex <= displayedIndex ? "done" : "waiting"}>
-            {ch}
-          </span>,
-        );
-        pos++;
-      }
-
-      units.push(
-        <span key={unitStart} className="mt-word-unit">
-          {group}
-        </span>,
-      );
+    if (isReplaying) {
+      setReplayTime(null);
+      setReplayFinished(false);
+    } else {
+      setReplayFinished(false);
+      setReplayTime(performance.now());
     }
-
-    return units;
-  }, [
-    article.text,
-    displayedIndex,
-    replayTime,
-    session.index,
-    session.done,
-    session.error,
-    session.input.length,
-    wrongFlash,
-    replayIndex,
-    ghost?.errors,
-    showGhost,
-    ghostOffset,
-  ]);
+  }
 
   const showFocusVeil = !focused && !session.done && !isReplaying;
+  const trackIndex = isReplaying ? ghostMark.index : session.done ? 0 : session.index;
+  const trackShift = layout ? rowShiftForGlyph(layout, trackIndex) : 0;
+  const viewportHeight = layout ? viewportHeightForRows(layout, 3) : null;
 
   return (
     <div className="mt-shadow-stage">
@@ -384,29 +591,43 @@ export function ShadowPractice({
         {!session.done && !course && (
           <>
             <span className="mt-bar-sep" aria-hidden="true" />
-            <label className="mt-pace-control">
+            <label className="mt-pace-control" data-active={guide !== "off" || undefined}>
               <span className="mt-pace-label">影子节奏</span>
-              {/* Native select preserves OS picker UX on touch devices and user.selectOptions tests. */}
-              <select
-                className="shadow-select"
-                value={guide}
-                onChange={(event) => {
-                  setGuide(event.target.value);
-                  if (replayTime !== null) {
-                    setReplayTime(null);
-                    setElapsed(0);
-                  }
-                  inputRef.current?.focus({ preventScroll: true });
-                }}
-              >
-                <option value="off">关闭</option>
-                {previous && <option value="last">上次记录</option>}
-                {[30, 60, 90].map((rate) => (
-                  <option key={rate} value={rate}>
-                    {rate} 字/分
-                  </option>
-                ))}
-              </select>
+              <span className="mt-select-shell">
+                {/* Native select preserves OS picker UX on touch devices and user.selectOptions tests. */}
+                <select
+                  className="shadow-select"
+                  value={guide}
+                  onChange={(event) => {
+                    setGuide(event.target.value);
+                    if (replayTime !== null) {
+                      setReplayTime(null);
+                      setReplayFinished(false);
+                    }
+                    inputRef.current?.focus({ preventScroll: true });
+                  }}
+                >
+                  <option value="off">关闭</option>
+                  {previous && <option value="last">上次记录</option>}
+                  {[30, 60, 90].map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate} 字/分
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="mt-select-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />
+                </svg>
+              </span>
             </label>
           </>
         )}
@@ -430,28 +651,16 @@ export function ShadowPractice({
         )}
       </div>
 
-      <div className="mt-arena-body" data-replaying={isReplaying || undefined}>
-        <div className="stroke-metrics">
-          <span className="mt-metric-progress">
-            {session.index} / {session.items.length} 字
-          </span>
-          {replayTime === null && (
-            <>
-              <span className="mt-metric-speed">
-                <b>{session.done ? result.speed : (speed ?? "—")}</b> 字/分
-              </span>
-              <span>
-                击键准确率 <b>{result.keys ? Math.round(result.accuracy) + "%" : "—"}</b>
-              </span>
-            </>
-          )}
-          <span>
-            {replayTime !== null ? "回放" : "用时"}{" "}
-            <b>
-              {duration(replayTime !== null ? elapsed : session.done ? result.elapsed : elapsed)}
-            </b>
-          </span>
-        </div>
+      <div className="mt-arena-body mt-shadow-arena" data-replaying={isReplaying || undefined}>
+        <ShadowLiveMetrics
+          index={session.index}
+          total={session.items.length}
+          done={session.done}
+          result={result}
+          clockStart={clockStart}
+          clockLimit={clockLimit}
+          isReplay={isReplaying}
+        />
 
         <div className="mt-passage-wrap" data-blurred={showFocusVeil || undefined}>
           <Input
@@ -516,39 +725,61 @@ export function ShadowPractice({
             maxLength={2}
             disabled={session.done}
           />
-          <label
-            ref={passageRef}
-            htmlFor={inputId}
-            className="shadow-passage motion-safe:scroll-smooth"
+          <div
+            className="mt-passage-viewport"
+            style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
           >
-            {glyphs}
-            {showGhost && replayIndex === session.items.length && (
-              <span
-                aria-hidden="true"
-                className="shadow-end"
-                data-glyph={session.items.length}
-                data-shadow-caret="0"
+            <label
+              ref={passageRef}
+              htmlFor={inputId}
+              className="shadow-passage"
+              style={
+                trackShift > 0 ? { transform: `translate3d(0, -${trackShift}px, 0)` } : undefined
+              }
+            >
+              <ShadowPassageGlyphs
+                text={article.text}
+                displayedIndex={displayedIndex}
+                sessionIndex={session.index}
+                sessionDone={session.done}
+                hasError={!!session.error}
+                inputLength={session.input.length}
+                wrongSeq={wrongFlash?.seq ?? 0}
+                replayActive={isReplaying}
+                ghostIndex={ghostMark.index}
+                ghostOffset={ghostMark.offset}
+                ghostErrors={!!ghostMark.errors}
+                showGhost={showGhost}
               />
-            )}
-            {!session.done && replayTime === null && (
-              <PassageCaret
-                index={session.index}
-                offset={session.input.length}
-                typing={isTyping}
-                error={!!session.error}
-                resetKey={article.id}
-              />
-            )}
-            {showGhost && (
-              <PassageCaret
-                index={replayIndex}
-                offset={ghostOffset}
-                ghost
-                typing={isReplaying || startTime !== null}
-                resetKey={article.id}
-              />
-            )}
-          </label>
+              {showGhost && ghostMark.index === session.items.length && (
+                <span
+                  aria-hidden="true"
+                  className="shadow-end"
+                  data-glyph={session.items.length}
+                  data-shadow-caret="0"
+                />
+              )}
+              {!session.done && !isReplaying && (
+                <PassageCaret
+                  index={session.index}
+                  offset={session.input.length}
+                  typing={isTyping}
+                  error={!!session.error}
+                  resetKey={article.id}
+                  layout={layout}
+                />
+              )}
+              {showGhost && (
+                <i
+                  ref={ghostCaretRef}
+                  data-index={ghostMark.index}
+                  data-offset={ghostMark.offset}
+                  className="passage-caret ghost-caret"
+                  aria-hidden="true"
+                />
+              )}
+            </label>
+          </div>
           {showFocusVeil && (
             <button
               type="button"
@@ -556,6 +787,18 @@ export function ShadowPractice({
               tabIndex={-1}
               onClick={() => inputRef.current?.focus({ preventScroll: true })}
             >
+              <svg
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m4 4 7 17 2.5-7.5L21 11z" />
+              </svg>
               点击此处或按字母键继续输入
             </button>
           )}
@@ -587,23 +830,25 @@ export function ShadowPractice({
           {showGhost && (
             <span className="mt-ghost-hud">
               <span aria-hidden="true" className="mt-ghost-swatch" />
-              {pace
-                ? `配速 ${pace} 字/分`
-                : replayTime === null
-                  ? "上次的影子"
-                  : "回放 " + duration(elapsed)}
-              {ghost && (
-                <kbd className={ghost.errors ? "mt-kbd-error" : "mt-kbd-ghost"}>{ghost.key}</kbd>
+              {pace ? `配速 ${pace} 字/分` : !isReplaying ? "上次记录" : "回放中"}
+              {ghostMark.key && (
+                <kbd className={ghostMark.errors ? "mt-kbd-error" : "mt-kbd-ghost"}>
+                  {ghostMark.key}
+                </kbd>
               )}
             </span>
           )}
 
           {!course && !previous && !session.done && !pace && (
-            <span className="mt-hud-hint">完成本篇即可与自己的记录跟打</span>
+            <span className="mt-hud-hint mt-chrome-fade">完成本篇即可与自己的记录同屏跟打</span>
           )}
         </div>
 
-        <p className="mt-status-line" role="status" data-error={!!session.error || undefined}>
+        <p
+          className={session.error ? "mt-status-line" : "mt-status-line mt-chrome-fade"}
+          role="status"
+          data-error={!!session.error || undefined}
+        >
           {session.error || (!session.done && "英文键盘输入双拼 · 标点自动跳过")}
         </p>
 
