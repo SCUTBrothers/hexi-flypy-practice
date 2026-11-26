@@ -68,14 +68,14 @@
       "source": "SCUTBrothers/cstack",
       "sourceType": "github",
       "skillPath": "skills/orchestration/cobe-help/SKILL.md",
-      "computedHash": "2483da4670dc4d028eed78c24f6bb4326426348c7235f6b3511097e1c64d1758",
+      "computedHash": "3e4f0a7a02368b7598b7ddf56d3e79adbeff2a1031ea0634678cde1776ef2cb1",
       "via": "."
     },
     "cobe-mode": {
       "source": "SCUTBrothers/cstack",
       "sourceType": "github",
       "skillPath": "skills/orchestration/cobe-mode/SKILL.md",
-      "computedHash": "b9cb22495ee98b940dacc4573025bc9b419f792bfcc751f85990945cdefac824",
+      "computedHash": "3e960e0341b66fe8453752f76ed835c9720a819499654ca67973de68f59774ed",
       "via": "."
     },
     "code-review": {
@@ -104,6 +104,13 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
       "computedHash": "d318d229015a4086c42d557d796e8f6b325c1065b0a16749967a4f24a39635e5",
+      "via": "."
+    },
+    "dispatch": {
+      "source": "SCUTBrothers/cstack",
+      "sourceType": "github",
+      "skillPath": "skills/orchestration/dispatch/SKILL.md",
+      "computedHash": "0858397013a28761415d66f55a5a7e695bb914680c300dfa454a5ba5bb70d40d",
       "via": "."
     },
     "fallow": {
@@ -334,7 +341,7 @@
       "source": "SCUTBrothers/cstack",
       "sourceType": "github",
       "skillPath": "skills/engineering/run-ticket/SKILL.md",
-      "computedHash": "72027f35a5aebffb9fc388885000b8c259a3628e53d4eb6407b3d255f6855d7f",
+      "computedHash": "c92797450e9597e9047a9983fa42134130afdec785fa5791d191fbe8af94ef61",
       "via": "."
     },
     "sharpen": {
@@ -383,14 +390,14 @@
       "source": "SCUTBrothers/cstack",
       "sourceType": "github",
       "skillPath": "skills/design/to-spec/SKILL.md",
-      "computedHash": "0faacb289df5d62cffd3845ac7b985b51190e8c32f6d536b25be024d18f20542",
+      "computedHash": "18c9b8f86e8aea7dee09bc06a7efc979ab519a4338d23f1e8fb8adba7e466c4e",
       "via": "."
     },
     "to-tickets": {
       "source": "SCUTBrothers/cstack",
       "sourceType": "github",
       "skillPath": "skills/design/to-tickets/SKILL.md",
-      "computedHash": "43bce8fb69a85439c7e0dea08018afbdfbf2cb4eefce82277b532fc101dc6233",
+      "computedHash": "7f829cac73b3ef5fe28347f875af8c1188daa370d7d51fb4c30a8a869f2a90bc",
       "via": "."
     },
     "typescript-best-practices": {

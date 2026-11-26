@@ -47,6 +47,7 @@ disable-model-invocation: true
 - 为缺少脚本化验收手段的项目生成本地应用验证技能与功能地图：`create-verification-skill`
 - 在业务代码变更后巡检并更新项目的本地验证技能与功能地图：`maintain-verification-skill`
 - 无现成流程可套用的大型迁移、跨模块改造或离开电脑异步审阅的长任务：`figure-it-out`
+- 需要通过本机 CLI 调度异构外部模型分担重逻辑实现、疑难排障或跨模型第二意见审查：`dispatch`
 - 为长时或多阶段运行维护仅追加 TSV 决策轨迹，并在交接前审计审阅：`show-me-your-work`
 - 依据当前 diff 与实测结果起草供审阅者阅读的 PR 正文（行为变化、验证依据与合并风险）：`pr`
 - 编写或审阅技术文档、RFC、README 与提交信息（中英兼容）：`technical-writing`

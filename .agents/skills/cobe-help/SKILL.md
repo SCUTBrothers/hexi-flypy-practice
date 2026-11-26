@@ -64,6 +64,7 @@ disable-model-invocation: true
 - 为缺少自动化端到端验收手段的项目生成本地 `verify-<app>` 技能与功能地图：`create-verification-skill`
 - 在应用代码演进后巡检并同步项目的 `verify-<app>` 验证技能与功能地图：`maintain-verification-skill` `[需子代理]`
 - 面对无现成流程的大型迁移、跨模块改造或异步长任务，量身设计可审计工作流：`figure-it-out` `[需子代理]`
+- 通过本机 CLI 调度异构外部模型分担重逻辑实现、疑难排障或对抗式第二意见审查（自动按需生效）：`dispatch`
 - 在长时或多阶段运行期间用仅追加 TSV 日志记录决策轨迹，并在交接前审阅：`show-me-your-work` `[需子代理]`
 - 依据当前 diff 与实测结果起草供审阅者阅读的 PR 正文：`pr`
 - 撰写或审阅技术文档、RFC、README 与提交信息（中文为主兼容英文）：`technical-writing`
@@ -81,14 +82,14 @@ disable-model-invocation: true
 - **`code-review` vs `architecture-review` vs `architect`**：`code-review` 围绕本轮具体 diff 核查需求偏差、调用方回归与可验证精简；`architecture-review` 面向存量模块评估值不值得重构，无需 diff 即可使用；`architect` 在目标方向已明确后，负责细化接口、数据类型与模块边界。
 - **`grill-me` vs `to-spec` vs `to-tickets` vs `run-ticket` vs `figure-it-out`**：`grill-me` 负责访谈拍板；`to-spec` 把已拍板的结论冻结为 `spec.md`；`to-tickets` 把 `spec.md` 拆成按顺序可独立验证的垂直切片任务单；`run-ticket` 在干净上下文中完成其中一片并回写状态与 commit；`figure-it-out` 面向无现成流程、需要自定义实验循环与多节点并行编排的大型非标迁移。
 - **`diagnosing-bugs` vs `tdd`**：`diagnosing-bugs` 用于现象模糊或复现不稳时，从零建立故障信号、提出假设并定位根因；`tdd` 适用于预期行为与低成本测试入口已明确时，先写失败测试再做修复。
-- **`arena` vs `swarm`**：`arena` 让所有节点做同一道没有唯一标准答案的设计/实现题，经盲审选出底座后手工嫁接各家代码亮点，产出一份最优解；`swarm` 用于拆片并行干活（partition）或有客观输赢判据的赛马（race），不做盲审与代码嫁接，最终汇总成一张 `PASS / ISSUES / BLOCKED` 表格。
+- **`arena` vs `swarm` vs `dispatch`**：`arena` 在同一宿主内并发做同题多解、盲审并手工嫁接亮点；`swarm` 在同一宿主内做分片盘点（partition）或客观指标赛马（race），汇总成一张 `PASS / ISSUES / BLOCKED` 表；`dispatch` 则是单会话通过外部 CLI 调度**异构模型**协同实现或给第二意见，主控负责起草规格、验收 diff 并对人转述。
 - **`interrogate` vs `blast-radius`**：`interrogate` 攻的是本次改动自身的漏洞（派红队在隔离工作树里写复现把新逻辑跑挂，滤除一切没跑过的口头挑刺）；`blast-radius` 查的是向外波及面（diff 之外三跳开外的调用方、协议或时序会不会被连带震碎，并跑代码证明安全核心事实）。
 - **`technical-writing` vs `pr` vs `writing-for-agents` vs `unslop`**：面向人类工程师写 README、RFC、API 参考或操作指南用 `technical-writing`；面向审阅者撰写含实测证据与合并风险的 PR 正文用 `pr`；面向执行指令的 Agent 编写技能或 `AGENTS.md` 用 `writing-for-agents`；专门清除中文文章与叙述中的 AI 套话用 `unslop`。
 - **`reflect` vs `correct` vs `automate-me`**：`reflect` 在单次任务做完后把刚学到的经验补进某个专项技能；`correct` 针对业务仓库里反复踩的坑加 lint/类型/测试硬约束；`automate-me` 跨近期多次会话提炼你个人的全局习惯来更新 `-mode` 技能。
 
 ## 常见机制疑问排查
 
-- **自然语言提问时，某项专项技能没有自动生效**：除 `typescript-best-practices` 和 `benchmark-checklist` 支持按需自动匹配外，其余入口技能均设有 `disable-model-invocation: true` 以免日常误触发和挤占上下文。请显式点名调用（如 `pi` 中 `/skill:<name>`、`codex` 中 `$<name>`），或统一通过 `cobe-mode` 自动路由。
+- **自然语言提问时，某项专项技能没有自动生效**：除 `typescript-best-practices`、`benchmark-checklist` 和 `dispatch` 支持按需自动匹配外，其余入口技能均设有 `disable-model-invocation: true` 以免日常误触发和挤占上下文。请显式点名调用（如 `pi` 中 `/skill:<name>`、`codex` 中 `$<name>`），或统一通过 `cobe-mode` 自动路由。
 - **对话聊了很多轮后，`cobe-mode` 约束力下降，或新问题被当成旧任务继续做**：单次消息加载的技能会随上下文拉长而衰减；开启独立新任务时重新带上 `cobe-mode`，或在消息开头写明“新任务：……”。
 - **当前宿主环境没有安装子智能体扩展或缺少外部依赖技能怎么办？**：未安装子智能体时，优先选用未标注 `[需子代理]` 的单会话技能（调用带 `[需子代理]` 的技能时模型也会在主会话降级完成）；声明了 `meta.require_skills` 的技能（如 `automate-me` 依赖 `skill-creator`）需确认宿主已内置（如 `codex` 自带）或提前安装对应外部技能。完整分类见仓库根目录 `catalog.md`。
 - **智能体只跑过编译或单测就宣称“修好了”**：直接在回复中点名原则：“按 `principle-prove-it-works` 原则，给我看真实运行输出，不要只看构建通过。”更多一句话纠偏技巧见 [references/prompting.md](./references/prompting.md)。
