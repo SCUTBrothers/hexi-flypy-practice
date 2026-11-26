@@ -423,3 +423,34 @@ test("group picker switches directly to typing and leaves the active group intac
   await waitFor(() => expect(trigger).toBe(document.activeElement));
   expect(screen.getByRole("heading", { name: "零声母" })).toBeTruthy();
 });
+test("theme switcher updates document theme and dark class, persists, and returns focus", async () => {
+  const user = userEvent.setup();
+  const view = render(<App />);
+  expect(document.documentElement.dataset.theme).toBe("serika");
+  expect(document.documentElement.classList.contains("dark")).toBe(true);
+  await user.click(screen.getByRole("button", { name: "界面主题" }));
+  await user.click(screen.getByRole("button", { name: /宣纸/ }));
+  expect(document.documentElement.dataset.theme).toBe("paper");
+  expect(document.documentElement.classList.contains("dark")).toBe(false);
+  await user.click(screen.getByRole("button", { name: "完成" }));
+  await waitFor(() => expect(input()).toBe(document.activeElement));
+  view.unmount();
+  render(<App />);
+  expect(document.documentElement.dataset.theme).toBe("paper");
+  expect(document.documentElement.classList.contains("dark")).toBe(false);
+});
+test("typing fades chrome automatically, Escape wakes it, and focus veil restores shadow typing", async () => {
+  const user = userEvent.setup();
+  const { container } = render(<App />);
+  const shell = container.querySelector(".app-shell")!;
+  await user.click(screen.getByRole("button", { name: "影子跟打" }));
+  const field = screen.getByRole("textbox", { name: "影子跟打输入" });
+  await user.keyboard("m");
+  expect(shell.getAttribute("data-typing")).toBe("on");
+  await user.keyboard("{Escape}");
+  expect(shell.getAttribute("data-typing")).toBeNull();
+  fireEvent.blur(field);
+  const veil = screen.getByRole("button", { name: "点击此处或按字母键继续输入" });
+  await user.click(veil);
+  expect(field).toBe(document.activeElement);
+});

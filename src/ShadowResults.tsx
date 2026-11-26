@@ -3,16 +3,56 @@ import { Button } from "@ui-sdk/react/button";
 import { getResult, type Stroke } from "./shadow-record";
 import { buildTimeline, nearestError, paceAt } from "./shadow-timeline";
 
-const colors = {
-  current: "#17674e",
-  previous: "#986326",
-  error: "#ba3651",
-  text: "#53665c",
-  grid: "#dce8df",
-};
 const seconds = (ms: number) => (ms / 1000).toFixed(1) + " 秒";
 const percentage = (value: number) => value.toFixed(1) + "%";
 type Timeline = ReturnType<typeof buildTimeline>;
+
+type ChartPalette = {
+  current: string;
+  previous: string;
+  error: string;
+  text: string;
+  grid: string;
+  surface: string;
+  cursor: string;
+};
+
+function readPalette(canvas: HTMLCanvasElement): ChartPalette {
+  const styles = getComputedStyle(canvas);
+  const pick = (token: string, fallback: string) =>
+    styles.getPropertyValue(token).trim() || fallback;
+  return {
+    current: pick("--mt-accent", "#e2b714"),
+    previous: pick("--mt-ghost", "#f2748b"),
+    error: pick("--mt-error", "#ca4754"),
+    text: pick("--mt-sub", "#8a8d91"),
+    grid: pick("--mt-border", "#42454a"),
+    surface: pick("--mt-bg", "#323437"),
+    cursor: pick("--mt-meta", "#9ea2a8"),
+  };
+}
+
+function traceSmooth(
+  context: CanvasRenderingContext2D,
+  points: Timeline["current"],
+  x: (at: number) => number,
+  y: (value: number) => number,
+) {
+  context.beginPath();
+  points.forEach(({ at, speed: value }, index) => {
+    const px = x(at);
+    const py = y(value);
+    if (index === 0) {
+      context.moveTo(px, py);
+      return;
+    }
+    const prev = points[index - 1];
+    const midX = (x(prev.at) + px) / 2;
+    const midY = (y(prev.speed) + py) / 2;
+    context.quadraticCurveTo(x(prev.at), y(prev.speed), midX, midY);
+    if (index === points.length - 1) context.lineTo(px, py);
+  });
+}
 
 function drawTimeline(
   context: CanvasRenderingContext2D,
@@ -22,28 +62,32 @@ function drawTimeline(
   selected: number,
   speed: number | null,
   previousSpeed: number | null,
+  palette: ChartPalette,
 ) {
-  const left = 43;
-  const right = width - 17;
-  const top = 13;
-  const bottom = height - 36;
+  const left = 42;
+  const right = width - 16;
+  const top = 14;
+  const bottom = height - 34;
   const x = (at: number) => left + ((right - left) * at) / data.duration;
   const y = (value: number) => bottom - ((bottom - top) * value) / data.maxSpeed;
+
   context.clearRect(0, 0, width, height);
-  context.font = "11px system-ui, sans-serif";
+  context.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.lineWidth = 1;
-  context.strokeStyle = colors.grid;
-  context.fillStyle = colors.text;
+  context.strokeStyle = palette.grid;
+  context.fillStyle = palette.text;
   context.textBaseline = "middle";
   context.textAlign = "right";
+
   for (let i = 0; i <= 3; i++) {
-    const value = (i * data.maxSpeed) / 3;
-    context.fillText(String(value), left - 8, y(value));
+    const value = Math.round((i * data.maxSpeed) / 3);
+    context.fillText(String(value), left - 10, y(value));
     context.beginPath();
     context.moveTo(left, y(value));
     context.lineTo(right, y(value));
     context.stroke();
   }
+
   const ticks = width < 380 ? 2 : 4;
   for (let i = 0; i <= ticks; i++) {
     const at = (data.duration * i) / ticks;
@@ -53,62 +97,64 @@ function drawTimeline(
 
   function line(points: Timeline["current"], color: string, dashed: boolean) {
     if (!points.length) return;
-    context.beginPath();
-    points.forEach(({ at, speed: value }, index) => {
-      if (index === 0) context.moveTo(x(at), y(value));
-      else context.lineTo(x(at), y(value));
-    });
     if (!dashed) {
-      const fill = context.createLinearGradient(0, top, 0, bottom);
-      fill.addColorStop(0, "#459c7633");
-      fill.addColorStop(1, "#459c7608");
+      traceSmooth(context, points, x, y);
       context.save();
       context.lineTo(x(points.at(-1)!.at), bottom);
       context.lineTo(x(points[0].at), bottom);
       context.closePath();
-      context.fillStyle = fill;
+      context.globalAlpha = 0.14;
+      context.fillStyle = color;
       context.fill();
       context.restore();
-      context.beginPath();
-      points.forEach(({ at, speed: value }, index) => {
-        if (index === 0) context.moveTo(x(at), y(value));
-        else context.lineTo(x(at), y(value));
-      });
     }
+    traceSmooth(context, points, x, y);
     context.strokeStyle = color;
     context.lineWidth = dashed ? 1.8 : 2.6;
     context.lineJoin = "round";
     context.lineCap = "round";
-    context.setLineDash(dashed ? [6, 5] : []);
+    context.setLineDash(dashed ? [5, 5] : []);
     context.stroke();
     context.setLineDash([]);
   }
-  line(data.current, colors.current, false);
-  line(data.previous, colors.previous, true);
+
+  line(data.previous, palette.previous, true);
+  line(data.current, palette.current, false);
 
   const cursor = x(selected);
   context.beginPath();
   context.moveTo(cursor, top);
-  context.lineTo(cursor, bottom + 11);
-  context.strokeStyle = "#718a7d";
+  context.lineTo(cursor, bottom + 10);
+  context.strokeStyle = palette.cursor;
   context.lineWidth = 1;
+  context.setLineDash([3, 3]);
   context.stroke();
+  context.setLineDash([]);
 
   function dot(px: number, py: number, color: string, radius: number) {
     context.beginPath();
     context.arc(px, py, radius, 0, 2 * Math.PI);
     context.fillStyle = color;
     context.fill();
-    context.strokeStyle = "#fbfdf9";
-    context.lineWidth = 1.5;
+    context.strokeStyle = palette.surface;
+    context.lineWidth = 2;
     context.stroke();
   }
-  for (const at of data.errors) dot(x(at), bottom + 11, colors.error, 3.7);
-  if (previousSpeed !== null) dot(cursor, y(previousSpeed), colors.previous, 4);
-  if (speed !== null) dot(cursor, y(speed), colors.current, 4.5);
+
+  for (const at of data.errors) dot(x(at), bottom + 10, palette.error, 3.6);
+  if (previousSpeed !== null) dot(cursor, y(previousSpeed), palette.previous, 4);
+  if (speed !== null) dot(cursor, y(speed), palette.current, 5);
 }
 
-function ResultChart({ current, previous }: { current: Stroke[]; previous?: Stroke[] }) {
+function ResultChart({
+  current,
+  previous,
+  themeKey,
+}: {
+  current: Stroke[];
+  previous?: Stroke[];
+  themeKey?: string;
+}) {
   const titleId = useId();
   const readoutId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -132,22 +178,31 @@ function ResultChart({ current, previous }: { current: Stroke[]; previous?: Stro
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       context.scale(ratio, ratio);
-      drawTimeline(context, width, height, data, selected, speed, previousSpeed);
+      drawTimeline(
+        context,
+        width,
+        height,
+        data,
+        selected,
+        speed,
+        previousSpeed,
+        readPalette(canvas),
+      );
     };
     paint();
     const observer = new ResizeObserver(paint);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [data, selected, speed, previousSpeed]);
+  }, [data, selected, speed, previousSpeed, themeKey]);
 
   return (
     <section className="result-chart" aria-labelledby={titleId}>
       <div className="result-chart-head">
         <div>
-          <h3 id={titleId} className="font-semibold">
+          <h3 id={titleId} className="text-sm font-medium">
             字速变化
           </h3>
-          <p className="mt-1 text-sm text-stone-600">最近 4 秒的平均字速 · 字/分</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">最近 4 秒平均字速 · 字/分</p>
         </div>
         <ul className="result-legend" aria-label="图例">
           <li data-series="current">本轮</li>
@@ -196,14 +251,11 @@ function ResultChart({ current, previous }: { current: Stroke[]; previous?: Stro
           </span>
         )}
         {error && (
-          <span className="text-rose-800">
+          <span className="mt-error-text">
             附近错键 <kbd>{error.key}</kbd>
           </span>
         )}
       </div>
-      <p className="mt-2 text-xs text-stone-600">
-        移动鼠标或点按图表查看对应时刻，也可用方向键调整。
-      </p>
     </section>
   );
 }
@@ -224,6 +276,7 @@ export function ShadowResults({
   previous,
   isReplaying,
   saveFailed,
+  themeKey,
   next,
   onRestart,
   onReplay,
@@ -233,6 +286,7 @@ export function ShadowResults({
   previous?: Stroke[];
   isReplaying: boolean;
   saveFailed: boolean;
+  themeKey?: string;
   next?: { title: string; label?: string; onClick: () => void };
   onRestart: () => void;
   onReplay: () => void;
@@ -241,6 +295,7 @@ export function ShadowResults({
   const nextTitleId = useId();
   const resultRef = useRef<HTMLElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     nextRef.current?.focus({ preventScroll: true });
     const frame = requestAnimationFrame(() => {
@@ -254,81 +309,97 @@ export function ShadowResults({
   const delta = last ? current.speed - last.speed : 0;
   const speedChange =
     delta === 0 ? "与上次字速相同" : `比上次${delta > 0 ? "快" : "慢"} ${Math.abs(delta)} 字/分`;
+
   return (
-    <section
-      ref={resultRef}
-      className="panel shadow-results scroll-mt-4"
-      aria-labelledby={headingId}
-    >
+    <section ref={resultRef} className="shadow-results scroll-mt-4" aria-labelledby={headingId}>
       <header className="result-header">
         <div>
-          <h2 id={headingId} className="text-xl font-semibold">
+          <h2 id={headingId} className="text-lg font-semibold tracking-tight">
             跟打统计
           </h2>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-xs text-muted-foreground">
             {title} · {current.characters} 字
           </p>
         </div>
-        <div className="grid gap-2 sm:justify-items-end">
-          <div className="flex flex-wrap gap-2">
-            {next && (
-              <Button
-                ref={nextRef}
-                data-variant="solid"
-                aria-describedby={nextTitleId}
-                onClick={next.onClick}
-              >
-                {next.label ?? "下一篇"}
-                <kbd aria-hidden="true" className="ml-2 hidden text-xs opacity-80 sm:inline">
-                  Enter
-                </kbd>
-              </Button>
-            )}
-            <Button onClick={onRestart}>再跟打一轮</Button>
-            <Button data-variant="ghost" onClick={onReplay}>
-              {isReplaying ? "停止回放" : "回放本轮"}
-            </Button>
-          </div>
-          {next && (
-            <p id={nextTitleId} className="text-sm text-stone-600">
-              接下来练《{next.title}》
-            </p>
-          )}
-        </div>
+        {next && (
+          <p id={nextTitleId} className="text-xs text-muted-foreground">
+            接下来练《{next.title}》
+          </p>
+        )}
       </header>
-      <dl className="result-scoreboard">
-        <div className="result-score result-score-primary">
-          <dt>平均字速</dt>
-          <dd>
-            <strong>{current.speed}</strong> <span>字/分</span>
-            {last && <span className="result-comparison">{speedChange}</span>}
-          </dd>
-        </div>
-        <div className="result-score">
-          <dt>按键准确率</dt>
-          <dd>
-            <strong>{percentage(current.accuracy)}</strong>
-            {last && <span className="result-comparison">上次 {percentage(last.accuracy)}</span>}
-          </dd>
-        </div>
-        <div className="result-score">
+
+      <div className="mt-results-hero">
+        <dl className="mt-hero-kpis">
+          <div className="mt-kpi-main">
+            <dt>字速</dt>
+            <dd>
+              <strong>{current.speed}</strong>
+              <span>字/分</span>
+              {last && <span className="result-comparison">{speedChange}</span>}
+            </dd>
+          </div>
+          <div className="mt-kpi-acc">
+            <dt>准确率</dt>
+            <dd>
+              <strong>{percentage(current.accuracy)}</strong>
+              {last && <span className="result-comparison">上次 {percentage(last.accuracy)}</span>}
+            </dd>
+          </div>
+        </dl>
+        <ResultChart current={strokes} previous={previous} themeKey={themeKey} />
+      </div>
+
+      <dl className="mt-results-strip">
+        <div>
           <dt>用时</dt>
-          <dd>
-            <strong>{(current.elapsed / 1000).toFixed(1)}</strong> <span>秒</span>
-            {last && <span className="result-comparison">上次 {seconds(last.elapsed)}</span>}
+          <dd className="tabular-nums">
+            <strong>{(current.elapsed / 1000).toFixed(1)}</strong> 秒
+            {last && <small>上次 {seconds(last.elapsed)}</small>}
           </dd>
         </div>
-        <div className="result-score">
+        <div>
+          <dt>完成汉字</dt>
+          <dd className="tabular-nums">
+            <strong>{current.characters}</strong> 字
+          </dd>
+        </div>
+        <div>
           <dt>按错次数</dt>
-          <dd>
-            <strong>{current.errors}</strong> <span>次</span>
-            {last && <span className="result-comparison">上次 {last.errors} 次</span>}
+          <dd className="tabular-nums">
+            <strong>{current.errors}</strong> 次{last && <small>上次 {last.errors} 次</small>}
+          </dd>
+        </div>
+        <div>
+          <dt>有效按键</dt>
+          <dd className="tabular-nums">
+            <strong>{current.keys}</strong> 键
           </dd>
         </div>
       </dl>
-      <ResultChart current={strokes} previous={previous} />
+
+      <div className="mt-results-actions">
+        {next && (
+          <Button
+            ref={nextRef}
+            data-variant="solid"
+            aria-describedby={nextTitleId}
+            onClick={next.onClick}
+          >
+            {next.label ?? "下一篇"}
+            <kbd aria-hidden="true" className="ml-2 hidden text-xs opacity-80 sm:inline">
+              Enter
+            </kbd>
+          </Button>
+        )}
+        <Button onClick={onRestart}>再跟打一轮</Button>
+        <Button data-variant="ghost" onClick={onReplay}>
+          {isReplaying ? "停止回放" : "回放本轮"}
+        </Button>
+      </div>
+
       <details className="result-details">
         <summary>展开成绩明细</summary>
+        {/* Compact read-only 6-row key/value summary kept as semantic table for screen readers and tests. */}
         <table>
           <thead>
             <tr>
@@ -348,8 +419,9 @@ export function ShadowResults({
           </tbody>
         </table>
       </details>
+
       {saveFailed && (
-        <p role="status" className="text-sm text-rose-800">
+        <p role="status" className="mt-error-text mt-3 text-sm">
           当前浏览器无法保存影子记录。
         </p>
       )}

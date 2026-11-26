@@ -13,10 +13,12 @@ import { Badge } from "@/components/reui/badge";
 import { ARTICLES } from "./data";
 
 type Article = (typeof ARTICLES)[number];
+
 const articleOptions = ARTICLES.map((article) => ({
   value: article.id,
   label: article.title,
   tag: article.tag,
+  count: article.syllables.split(" ").length,
   keywords: [article.tag, article.text, article.description],
 }));
 
@@ -37,15 +39,7 @@ export function ShadowArticlePicker({
   const returnToPractice = useRef(false);
 
   return (
-    <div className="flex min-w-0 flex-col items-start gap-2">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{article.tag}</span>
-        {completed.has(article.id) ? (
-          <Badge variant="success-light">已练习</Badge>
-        ) : (
-          <span>未练习</span>
-        )}
-      </div>
+    <div className="mt-picker-group">
       <Combobox<string>
         items={articleOptions}
         value={article.id}
@@ -60,7 +54,13 @@ export function ShadowArticlePicker({
         onOpenChangeComplete={(open) => {
           if (!open && returnToPractice.current) {
             const field = typingInput.current;
-            (field && !field.disabled ? field : anchor)?.focus({ preventScroll: true });
+            if (field && !field.disabled) {
+              field.focus({ preventScroll: true });
+              const end = field.value.length;
+              field.setSelectionRange(end, end);
+            } else {
+              anchor?.focus({ preventScroll: true });
+            }
           }
         }}
         onValueChange={(id) => {
@@ -72,7 +72,7 @@ export function ShadowArticlePicker({
           aria-label={`切换跟打文章，当前《${article.title}》`}
           className="article-trigger"
         >
-          {article.title}
+          <span className="truncate">{article.title}</span>
         </ComboboxTrigger>
         <ComboboxContent anchor={anchor} className="article-options">
           <ComboboxInput
@@ -97,9 +97,10 @@ export function ShadowArticlePicker({
             {(state) =>
               (state.items as typeof articleOptions).map((item) => (
                 <ComboboxItem key={item.value} value={item.value} label={item.label}>
-                  <span>{item.label}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {completed.has(item.value) ? "已练习" : item.tag}
+                  <span className="truncate">{item.label}</span>
+                  <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground tabular-nums">
+                    <span>{item.count}字</span>
+                    <span>{completed.has(item.value) ? "已练习" : item.tag}</span>
                   </span>
                 </ComboboxItem>
               ))
@@ -107,6 +108,14 @@ export function ShadowArticlePicker({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
+      <div className="mt-picker-meta">
+        <span>{article.tag}</span>
+        {completed.has(article.id) ? (
+          <Badge variant="success-light">已练习</Badge>
+        ) : (
+          <span>未练习</span>
+        )}
+      </div>
     </div>
   );
 }
